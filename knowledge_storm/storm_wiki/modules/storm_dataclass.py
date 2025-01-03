@@ -485,6 +485,12 @@ class StormArticle(Article):
             reference["url_to_info"][url] = reference["url_to_info"][url].to_dict()
         FileIOHelper.dump_json(reference, file_path)
 
+    def dump_reference_to_string(self):
+        reference = copy.deepcopy(self.reference)
+        for url in reference["url_to_info"]:
+            reference["url_to_info"][url] = reference["url_to_info"][url].to_dict()
+        return reference
+
     def dump_article_as_plain_text(self, file_path):
         text = self.to_string()
         FileIOHelper.write_str(text, file_path)

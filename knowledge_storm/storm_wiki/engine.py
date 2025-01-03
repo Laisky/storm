@@ -352,7 +352,7 @@ class STORMWikiRunner(Engine):
         do_polish_article: bool = True,
         remove_duplicate: bool = False,
         callback_handler: BaseCallbackHandler = BaseCallbackHandler(),
-    ):
+    ) -> dict:
         """
         Run the STORM pipeline.
 
@@ -427,6 +427,7 @@ class STORMWikiRunner(Engine):
             )
 
         # article polishing module
+        polished_article: StormArticle = None
         if do_polish_article:
             if draft_article is None:
                 draft_article_path = os.path.join(
@@ -440,6 +441,16 @@ class STORMWikiRunner(Engine):
                     draft_article_path=draft_article_path,
                     url_to_info_path=url_to_info_path,
                 )
-            self.run_article_polishing_module(
+            polished_article = self.run_article_polishing_module(
                 draft_article=draft_article, remove_duplicate=remove_duplicate
             )
+
+        # return the content of polished article and url_to_info in dict
+        return {
+            "article": polished_article.to_string(),
+            "references": draft_article.dump_reference_to_string(),
+        }
+
+    def clean(self):
+        """Clean the output directory."""
+        FileIOHelper.remove_dir(self.args.output_dir)
