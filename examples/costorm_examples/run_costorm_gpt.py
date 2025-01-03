@@ -32,7 +32,7 @@ def main(args):
         "api_provider": "openai",
         "temperature": 1.0,
         "top_p": 0.9,
-        "api_base": None,
+        "api_base": os.getenv("OPENAI_API_BASE"),
     } if os.getenv('OPENAI_API_TYPE') == 'openai' else {
         "api_key": os.getenv("AZURE_API_KEY"),
         "temperature": 1.0,
@@ -118,12 +118,12 @@ def main(args):
 
     # Below is an example of how users may interact with Co-STORM to seek information together
     # In actual deployment, we suggest allowing the user to decide whether to observe the agent utterance or inject a turn
-    
+
     # observing Co-STORM LLM agent utterance for 5 turns
     for _ in range(1):
         conv_turn = costorm_runner.step()
         print(f"**{conv_turn.role}**: {conv_turn.utterance}\n")
-    
+
     # active engaging by injecting your utterance
     your_utterance = input('Your utterance: ')
     costorm_runner.step(user_utterance=your_utterance)
