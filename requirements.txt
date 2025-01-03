@@ -63,7 +63,6 @@ jsonschema==4.23.0
 jsonschema-specifications==2024.10.1
 jusText==3.0.1
 kipp==0.2.11
--e git+https://github.com/Laisky/storm.git@5a61eec81d6811619ee291aa64dbbd3b5e01f385#egg=knowledge_storm
 langchain-core==0.3.28
 langchain-huggingface==0.1.2
 langchain-qdrant==0.2.0
