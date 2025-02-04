@@ -18,4 +18,6 @@ RUN adduser --disabled-password --gecos '' laisky \
     && chown -R laisky:laisky /app
 USER laisky
 
+EXPOSE 8080
+
 CMD [ "python" , "-m" , "knowledge_storm.server" ]
