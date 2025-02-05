@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from kipp.redis.utils import RedisUtils
 from kipp.redis.consts import KEY_PREFIX_TASK
 
+from knowledge_storm.server.utils import utcnow
+
+
 KEY_TASK_LLM_STORM = KEY_PREFIX_TASK + "llm_storm/pending"
 KEY_PREFIX_TASK_LLM_STORM_RESULT = KEY_PREFIX_TASK + "llm_storm/result/"
 
@@ -66,7 +69,7 @@ def add_llm_storm_task(rutils: RedisUtils, prompt: str, api_key: str) -> str:
         task_id=task_id,
         prompt=prompt,
         api_key=api_key,
-        created_at=datetime.now().isoformat(),
+        created_at=utcnow(),
     )
     key = KEY_TASK_LLM_STORM + task_id
     rutils.rpush(key, task.to_string())

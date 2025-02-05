@@ -21,6 +21,7 @@ from knowledge_storm.storm_wiki.engine import (
     STORMWikiRunner,
     STORMWikiRunnerArguments,
 )
+from knowledge_storm.server.utils import utcnow
 from knowledge_storm.server.tasks import (
     get_llm_storm_task_blocking,
     TASK_STATUS_PENDING,
@@ -113,7 +114,6 @@ def run_task_worker():
     for i in range(10):
         executor.submit(_task_worker, logger.getChild(f"worker_{i}"), rutils)
 
-
 def _task_worker(logger: Logger, rutils: RedisUtils):
     logger.info(f"task worker started")
 
@@ -131,7 +131,7 @@ def _task_worker(logger: Logger, rutils: RedisUtils):
             result = run_storm_wiki(task.api_key, task.prompt)
 
             task.status = TASK_STATUS_SUCCESS
-            task.finished_at = datetime.datetime.now().isoformat()
+            task.finished_at = utcnow()
             task.result_article = result["article"]
             task.result_references = result["references"]
         except Exception as err:
@@ -139,7 +139,7 @@ def _task_worker(logger: Logger, rutils: RedisUtils):
 
             if task:
                 task.status = TASK_STATUS_FAILED
-                task.finished_at = datetime.datetime.now().isoformat()
+                task.finished_at = utcnow()
                 task.failed_reason = str(err)
 
         try:
