@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import shutil
 from dataclasses import dataclass, field
 from typing import Union, Literal, Optional
 
@@ -449,4 +450,6 @@ class STORMWikiRunner(Engine):
 
     def clean(self):
         """Clean the output directory."""
-        FileIOHelper.remove_dir(self.args.output_dir)
+        # FileIOHelper.remove_dir(self.args.output_dir)
+        if os.path.exists(self.args.output_dir):
+            shutil.rmtree(self.args.output_dir)

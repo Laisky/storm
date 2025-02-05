@@ -14,15 +14,16 @@ TASK_STATUS_PENDING: str = "pending"
 TASK_STATUS_SUCCESS: str = "success"
 TASK_STATUS_FAILED: str = "failed"
 
+
 @dataclass
 class StormTask:
     task_id: str
     prompt: str
     api_key: str
-    created_at: datetime
+    created_at: str
     status: str = TASK_STATUS_PENDING
     failed_reason: str = None
-    finished_at: datetime = None
+    finished_at: str = None
     result_article: str = None
     result_references: Dict[str, Dict] = None
 
@@ -32,8 +33,8 @@ class StormTask:
                 "task_id": self.task_id,
                 "prompt": self.prompt,
                 "api_key": self.api_key,
-                "created_at": self.created_at.isoformat(),
-                "finished_at": self.finished_at.isoformat() if self.finished_at else None,
+                "created_at": self.created_at,
+                "finished_at": self.finished_at,
                 "status": self.status,
                 "result_article": self.result_article,
                 "result_references": self.result_references,
@@ -90,6 +91,7 @@ def get_llm_storm_task_blocking(rutils: RedisUtils) -> StormTask:
 
     return StormTask.from_string(value)
 
+
 def upload_llm_storm_result(rutils: RedisUtils, task: StormTask) -> None:
     """Upload the result of an LLM Storm task to Redis.
 
@@ -98,4 +100,4 @@ def upload_llm_storm_result(rutils: RedisUtils, task: StormTask) -> None:
         task (StormTask): The StormTask with updated result.
     """
     key = KEY_PREFIX_TASK_LLM_STORM_RESULT + task.task_id
-    rutils.set_item(key, task.to_string(), 3600*24*7)
+    rutils.set_item(key, task.to_string(), 3600 * 24 * 7)

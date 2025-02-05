@@ -33,6 +33,7 @@ from knowledge_storm.server.prd import REDIS_HOST, REDIS_PORT, REDIS_DB
 logger = setup_logger(__name__)
 executor = ThreadPoolExecutor(max_workers=20)
 
+
 def create_storm_wiki_runner(apikey: str):
     api_base = os.getenv("OPENAI_API_BASE", "https://oneapi.laisky.com")
     api_base = api_base.removesuffix("/").removesuffix("/v1") + "/v1/"
@@ -122,7 +123,7 @@ def _task_worker(logger: Logger, rutils: RedisUtils):
             result = run_storm_wiki(task.api_key, task.prompt)
 
             task.status = TASK_STATUS_SUCCESS
-            task.finished_at = datetime.datetime.now()
+            task.finished_at = datetime.datetime.now().isoformat()
             task.result_article = result["article"]
             task.result_references = result["references"]
         except Exception as err:
@@ -130,7 +131,7 @@ def _task_worker(logger: Logger, rutils: RedisUtils):
 
             if task:
                 task.status = TASK_STATUS_FAILED
-                task.finished_at = datetime.datetime.now()
+                task.finished_at = datetime.datetime.now().isoformat()
                 task.failed_reason = str(err)
 
         try:
