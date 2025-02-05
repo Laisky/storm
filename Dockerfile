@@ -16,10 +16,6 @@ COPY . .
 # Build and install the package into a target directory
 RUN python setup.py install --prefix=/install
 
-# Set working directory and copy remaining runtime files if required
-WORKDIR /app
-COPY . .
-
 # Create non-root user and set permissions
 RUN adduser --disabled-password --gecos '' laisky && \
     chown -R laisky:laisky /app
