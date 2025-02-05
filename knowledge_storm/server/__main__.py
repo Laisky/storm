@@ -23,6 +23,8 @@ from knowledge_storm.storm_wiki.engine import (
 )
 from knowledge_storm.server.tasks import (
     get_llm_storm_task_blocking,
+    TASK_STATUS_PENDING,
+    TASK_STATUS_RUNNING,
     TASK_STATUS_SUCCESS,
     TASK_STATUS_FAILED,
     StormTask,
@@ -119,7 +121,13 @@ def _task_worker(logger: Logger, rutils: RedisUtils):
     while True:
         try:
             task = get_llm_storm_task_blocking(rutils)
+            assert task.status == TASK_STATUS_PENDING, "task status is not pending"
             logger.info(f"get task from rdb, {task.task_id=}")
+
+            # upload pending task
+            task.status = TASK_STATUS_RUNNING
+            upload_llm_storm_result(rutils, task)
+
             result = run_storm_wiki(task.api_key, task.prompt)
 
             task.status = TASK_STATUS_SUCCESS

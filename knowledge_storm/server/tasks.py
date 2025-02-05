@@ -11,6 +11,7 @@ KEY_TASK_LLM_STORM = KEY_PREFIX_TASK + "llm_storm/pending"
 KEY_PREFIX_TASK_LLM_STORM_RESULT = KEY_PREFIX_TASK + "llm_storm/result/"
 
 TASK_STATUS_PENDING: str = "pending"
+TASK_STATUS_RUNNING: str = "running"
 TASK_STATUS_SUCCESS: str = "success"
 TASK_STATUS_FAILED: str = "failed"
 
@@ -100,4 +101,4 @@ def upload_llm_storm_result(rutils: RedisUtils, task: StormTask) -> None:
         task (StormTask): The StormTask with updated result.
     """
     key = KEY_PREFIX_TASK_LLM_STORM_RESULT + task.task_id
-    rutils.set_item(key, task.to_string(), 3600 * 24 * 7)
+    rutils.set_item(key, task.to_string(), 3600 * 24 * 30)
