@@ -1,23 +1,30 @@
-FROM python:3.11.11-bullseye
+# Use a build stage with necessary build dependencies
+FROM python:3.11.11-bullseye as builder
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends g++ make gcc git build-essential ca-certificates curl \
-    libc-dev libssl-dev libffi-dev zlib1g-dev python3-dev \
-    && update-ca-certificates
+# Install build packages only needed during build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    g++ gcc make git build-essential ca-certificates curl \
+    libc-dev libssl-dev libffi-dev zlib1g-dev python3-dev && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-ADD ./requirements.txt .
-RUN pip install -r requirements.txt
+COPY ./requirements.txt .
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
-ADD . .
-# RUN rm -rf /app/ramjet/settings/prd.*
+COPY . .
 
-RUN python setup.py install
+# Build and install the package into a target directory
+RUN python setup.py install --prefix=/install
 
-RUN adduser --disabled-password --gecos '' laisky \
-    && chown -R laisky:laisky /app
+# Set working directory and copy remaining runtime files if required
+WORKDIR /app
+COPY . .
+
+# Create non-root user and set permissions
+RUN adduser --disabled-password --gecos '' laisky && \
+    chown -R laisky:laisky /app
 USER laisky
 
 EXPOSE 8080
 
-CMD [ "python" , "-m" , "knowledge_storm.server" ]
+CMD ["python", "-m", "knowledge_storm.server"]
