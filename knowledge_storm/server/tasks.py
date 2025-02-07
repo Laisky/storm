@@ -1,7 +1,7 @@
 import uuid
 import json
 from datetime import datetime
-from typing import NamedTuple, Dict
+from typing import Dict, Optional
 from dataclasses import dataclass
 
 from kipp.redis.utils import RedisUtils
@@ -9,8 +9,7 @@ from kipp.redis.consts import KEY_PREFIX_TASK
 
 from knowledge_storm.server.utils import utcnow
 
-
-KEY_TASK_LLM_STORM = KEY_PREFIX_TASK + "llm_storm/pending"
+KEY_TASK_LLM_STORM = KEY_PREFIX_TASK + "llm_storm/pending"  # Fixed pending list key
 KEY_PREFIX_TASK_LLM_STORM_RESULT = KEY_PREFIX_TASK + "llm_storm/result/"
 
 TASK_STATUS_PENDING: str = "pending"
@@ -26,10 +25,11 @@ class StormTask:
     api_key: str
     created_at: str
     status: str = TASK_STATUS_PENDING
-    failed_reason: str = None
-    finished_at: str = None
-    result_article: str = None
-    result_references: Dict[str, Dict] = None
+    failed_reason: Optional[str] = None
+    finished_at: Optional[str] = None
+    result_article: Optional[str] = None
+    result_references: Optional[Dict[str, Dict]] = None
+    runner: str = ""
 
     def to_string(self) -> str:
         return json.dumps(
@@ -43,12 +43,16 @@ class StormTask:
                 "result_article": self.result_article,
                 "result_references": self.result_references,
                 "failed_reason": self.failed_reason,
+                "runner": self.runner,
             }
         )
 
     @classmethod
     def from_string(cls, task_str: str):
-        task_dict = json.loads(task_str)
+        try:
+            task_dict = json.loads(task_str)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid task string: {e}")
         return cls(**task_dict)
 
 
@@ -64,35 +68,33 @@ def add_llm_storm_task(rutils: RedisUtils, prompt: str, api_key: str) -> str:
         str: The task ID.
     """
     task_id = str(uuid.uuid4())
-
     task = StormTask(
         task_id=task_id,
         prompt=prompt,
         api_key=api_key,
         created_at=utcnow(),
     )
-    key = KEY_TASK_LLM_STORM + task_id
-    rutils.rpush(key, task.to_string())
+    # Push the task to the pending list (always the same key)
+    rutils.rpush(KEY_TASK_LLM_STORM, task.to_string())
     return task_id
 
 
 def get_llm_storm_task_blocking(rutils: RedisUtils) -> StormTask:
-    """Retrieve and remove a task from LLM Storm by task ID.
+    """Retrieve and remove a task from LLM Storm pending list.
 
     Args:
         rutils (RedisUtils): Redis utils instance.
-        task_id (str): The task ID.
 
     Returns:
         StormTask: The retrieved StormTask object.
 
     Raises:
-        ValueError: If the task is not found.
+        ValueError: If no task is found.
     """
-    _, value = rutils.lpop_keys_blocking([KEY_TASK_LLM_STORM])
+    # rutils.lpop_keys_blocking returns a tuple (key, value) from one of the given keys.
+    key, value = rutils.lpop_keys_blocking([KEY_TASK_LLM_STORM])
     if not value:
-        raise ValueError("Task not found")
-
+        raise ValueError("Task not found from key: " + key)
     return StormTask.from_string(value)
 
 

@@ -124,6 +124,8 @@ def _task_worker(logger: Logger, rutils: RedisUtils):
             assert task.status == TASK_STATUS_PENDING, "task status is not pending"
             logger.info(f"get task from rdb, {task.task_id=}")
 
+            task.runner = "Co-STORM"
+
             # upload pending task
             task.status = TASK_STATUS_RUNNING
             upload_llm_storm_result(rutils, task)
