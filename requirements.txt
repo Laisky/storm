@@ -1,4 +1,5 @@
-dspy_ai==2.5.43
+dspy-ai==2.5.43
+openai~=1.61.1
 wikipedia==1.4.0
 # sentence-transformers
 toml
