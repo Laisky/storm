@@ -28,7 +28,6 @@ from knowledge_storm.server.tasks import (
     StormTask,
     upload_llm_storm_result,
 )
-from knowledge_storm.server.prd import REDIS_HOST, REDIS_PORT, REDIS_DB
 
 logger = setup_logger(__name__)
 executor = ThreadPoolExecutor(max_workers=20)
@@ -45,6 +44,9 @@ OPENAI_API_BASE = (
 OPENAI_MAX_TOKENS = int(os.getenv("OPENAI_MAX_TOKENS", "1000"))
 OPENAI_MODEL_NAME = os.getenv("OPENAI_MODEL_NAME", "gpt-4o-mini")
 BING_SEARCH_API_KEY = os.getenv("BING_SEARCH_API_KEY", "")
+REDIS_HOST = os.getenv("REDIS_HOST", "")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 
 assert BING_SEARCH_API_KEY, "BING_SEARCH_API_KEY is required"
 # =====================================
@@ -117,16 +119,22 @@ async def handle_deep_research(request: aiohttp.web.Request) -> aiohttp.web.Resp
     return web.json_response(result)
 
 
-def run_task_worker():
+def run_task_redis_subscribers():
     """Run task workers in the background"""
+    if not REDIS_HOST:
+        logger.warning("REDIS_HOST is not set, task redis subscribers will not start")
+        return
+
     rdb = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB)
     rutils = RedisUtils(rdb, logger.getChild("redis_utils"))
 
     for i in range(10):
-        executor.submit(_task_worker, logger.getChild(f"worker_{i}"), rutils)
+        executor.submit(_redis_task_worker, logger.getChild(f"worker_{i}"), rutils)
+
+    logger.info(f"task redis subscribers started, listening to redis at {REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}")
 
 
-def _task_worker(logger: Logger, rutils: RedisUtils):
+def _redis_task_worker(logger: Logger, rutils: RedisUtils):
     logger.info(f"task worker started")
 
     task: Optional[StormTask] = None
@@ -188,6 +196,6 @@ def create_app():
 
 
 if __name__ == "__main__":
-    run_task_worker()
+    run_task_redis_subscribers()
     logger.info(f"server started at :8080")
     web.run_app(create_app(), port=8080)
