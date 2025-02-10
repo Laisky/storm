@@ -43,21 +43,26 @@ OPENAI_API_BASE = (
 )
 OPENAI_MAX_TOKENS = int(os.getenv("OPENAI_MAX_TOKENS", "1000"))
 OPENAI_MODEL_NAME = os.getenv("OPENAI_MODEL_NAME", "gpt-4o-mini")
-BING_SEARCH_API_KEY = os.getenv("BING_SEARCH_API_KEY", "")
+
 REDIS_HOST = os.getenv("REDIS_HOST", "")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 
+BING_SEARCH_API_KEY = os.getenv("BING_SEARCH_API_KEY", "")
 assert BING_SEARCH_API_KEY, "BING_SEARCH_API_KEY is required"
+
+COSTORM_MAX_CONV_TURN = int(os.getenv("COSTORM_MAX_CONV_TURN", "3"))
+COSTORM_MAX_PERSPECTIVE = int(os.getenv("COSTORM_MAX_PERSPECTIVE", "3"))
+COSTORM_MAX_SEARCH_TOP_K = int(os.getenv("COSTORM_MAX_SEARCH_TOP_K", "3"))
 # =====================================
 
 
 def create_storm_wiki_runner(apikey: str):
     engine_args = STORMWikiRunnerArguments(
         output_dir="temp",
-        max_conv_turn=3,
-        max_perspective=3,
-        search_top_k=3,
+        max_conv_turn=COSTORM_MAX_CONV_TURN,
+        max_perspective=COSTORM_MAX_PERSPECTIVE,
+        search_top_k=COSTORM_MAX_SEARCH_TOP_K,
         max_thread_num=10,
     )
     openai_kwargs = {
