@@ -1,11 +1,27 @@
 # Deep-Research Web Service
 
 - [Deep-Research Web Service](#deep-research-web-service)
-  - [Deploy](#deploy)
-  - [Request](#request)
-  - [Response](#response)
+  - [SaaS](#saas)
+  - [Self Deploy](#self-deploy)
+    - [Request](#request)
+    - [Response](#response)
 
-## Deploy
+## SaaS
+
+If you have already purchased credits and have an API key on my one-api service, you can directly use my deployed deep-research gateway.
+
+For purchase options, please refer to https://wiki.laisky.com/projects/gpt/pay/
+
+```sh
+curl --location --globoff 'https://chat.laisky.com/deepresearch' \
+  --header 'Content-Type: application/json' \
+  --header 'Authorization: Bearer YOUR_ONEAPI_API_KEY' \
+  --data '{
+      "prompt": "YOUR_QUESTION"
+  }'
+```
+
+## Self Deploy
 
 You can quickly deploy the co-storm deep-research HTTP web service using docker-compose.
 
@@ -33,7 +49,7 @@ llmstorm:
     REDIS_HOST: 100.122.41.16
 ```
 
-## Request
+### Request
 
 ```sh
 curl --location 'https://YOUR_STORM_ADDR/deep-research' \
@@ -44,7 +60,7 @@ curl --location 'https://YOUR_STORM_ADDR/deep-research' \
   }'
 ```
 
-## Response
+### Response
 
 ```json
 {
