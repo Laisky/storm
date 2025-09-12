@@ -8,15 +8,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY ./requirements.txt .
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
+# Copy dependency spec first for better layer caching
+COPY ./requirements.txt ./
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy project source
 COPY . .
 
-# Build and install the package into a target directory
-RUN python setup.py install --prefix=/install
+# Install the package (editable install keeps source for dev, switch to --no-deps . for prod)
+RUN pip install --no-cache-dir .
 
-# Create non-root user and set permissions
+# Create non-root user and set permissions (after install so site-packages owned by root, but app src owned by user)
 RUN adduser --disabled-password --gecos '' laisky && \
     chown -R laisky:laisky /app
 USER laisky
