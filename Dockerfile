@@ -1,5 +1,5 @@
 # Use a build stage with necessary build dependencies
-FROM python:3.11.11-bullseye as builder
+FROM python:3.11.14-bullseye as builder
 
 # Install build packages only needed during build
 RUN apt-get update && apt-get install -y --no-install-recommends \
