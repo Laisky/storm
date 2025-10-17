@@ -1,7 +1,7 @@
 dspy-ai==2.5.43
 openai~=1.61.1
 wikipedia==1.4.0
-# sentence-transformers
+sentence-transformers
 toml
 langchain-text-splitters
 trafilatura

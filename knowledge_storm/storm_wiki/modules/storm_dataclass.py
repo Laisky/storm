@@ -4,7 +4,14 @@ from collections import OrderedDict
 from typing import Union, Optional, Any, List, Tuple, Dict
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError as exc:
+    raise ImportError(
+        "SentenceTransformer is required for knowledge_storm.storm_wiki modules. "
+        "Install the 'sentence-transformers' package to continue."
+    ) from exc
 from sklearn.metrics.pairwise import cosine_similarity
 
 from ...interface import Information, InformationTable, Article, ArticleSectionNode
