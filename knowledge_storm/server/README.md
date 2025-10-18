@@ -70,7 +70,7 @@ llmstorm:
   environment:
     OPENAI_API_TYPE: openai
     OPENAI_MAX_TOKENS: 4000
-    OPENAI_MODEL_NAME: gemini-2.0-flash-001
+    OPENAI_MODEL_NAME: gemini-2.5-flash
     OPENAI_API_BASE: https://oneapi.laisky.com/v1/
     REDIS_HOST: 100.122.41.16 # optional, enables persistence
 ```
