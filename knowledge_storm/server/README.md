@@ -1,369 +1,310 @@
-# Deep-Research Web Service
+# Co-STORM Web API Manual
 
-- [Deep-Research Web Service](#deep-research-web-service)
-  - [SaaS](#saas)
-  - [Self Deploy](#self-deploy)
+## Contents
+
+- [Co-STORM Web API Manual](#co-storm-web-api-manual)
+  - [Contents](#contents)
+  - [Overview](#overview)
+  - [Authentication](#authentication)
+  - [Deployment Options](#deployment-options)
+    - [SaaS](#saas)
+    - [Self Deploy](#self-deploy)
+  - [Deep-Research Endpoint](#deep-research-endpoint)
     - [Request](#request)
     - [Response](#response)
+  - [Conversational Co-STORM API](#conversational-co-storm-api)
+    - [Session Lifecycle](#session-lifecycle)
+    - [Create Session](#create-session)
+    - [Post Message](#post-message)
+    - [Poll Updates](#poll-updates)
+    - [Stream Updates](#stream-updates)
+    - [Get Session View](#get-session-view)
+    - [Delete Session](#delete-session)
+    - [Event Types](#event-types)
+    - [Error Responses](#error-responses)
+  - [Configuration Reference](#configuration-reference)
+  - [Redis and Persistence](#redis-and-persistence)
+  - [FAQ](#faq)
 
-## SaaS
 
-If you have already purchased credits and have an API key on my one-api service, you can directly use my deployed deep-research gateway.
+## Overview
 
-For purchase options, please refer to https://wiki.laisky.com/projects/gpt/pay/
+The Co-STORM service exposes two LLM-driven workflows:
+
+- **Deep Research** (`POST /deep-research`): runs a full research pipeline and returns a polished article plus citation metadata in one response.
+- **Conversational Co-STORM** (`/conversation/...`): maintains a multi-turn collaborative research session with incremental updates, streaming output, and resumable state.
+
+All timestamps are returned in UTC, and every response is JSON unless an endpoint explicitly uses Server-Sent Events (SSE).
+
+## Authentication
+
+- Supply `Authorization: Bearer <API_KEY>` on every request.
+- Keys are hashed before storage; you can safely reuse the same key across endpoints.
+- Requests missing the header receive `401 Unauthorized`.
+
+## Deployment Options
+
+### SaaS
+
+Existing customers can call the hosted gateway immediately:
 
 ```sh
 curl --location --globoff 'https://chat.laisky.com/deepresearch' \
-  --header 'Content-Type: application/json' \
-  --header 'Authorization: Bearer YOUR_ONEAPI_API_KEY' \
-  --data '{
-      "prompt": "YOUR_QUESTION"
-  }'
+    --header 'Content-Type: application/json' \
+    --header 'Authorization: Bearer YOUR_ONEAPI_API_KEY' \
+    --data '{"prompt": "YOUR QUESTION"}'
 ```
 
-## Self Deploy
+### Self Deploy
 
-You can quickly deploy the co-storm deep-research HTTP web service using docker-compose.
+Run the published image to host your own gateway:
 
-```yml
+```yaml
 llmstorm:
   image: ppcelery/llm-storm:latest
   restart: unless-stopped
   logging:
-    driver: "json-file"
+    driver: json-file
     options:
-      max-size: "10m"
-  ports:
-    # HTTP POST /deep-research {"prompt": "PUT YOUR QUERY HERE"}
-    # with HEADER "Authorization: Bearer YOUR_API_KEY"
-    - "100.97.108.34:22083:8080"
-  env_file:
-    # set BING_SEARCH_API_KEY in env file
-    - /opt/configs/env/home/storm.env
+      max-size: 10m
   environment:
     OPENAI_API_TYPE: openai
     OPENAI_MAX_TOKENS: 4000
     OPENAI_MODEL_NAME: gemini-2.0-flash-001
     OPENAI_API_BASE: https://oneapi.laisky.com/v1/
-    # (optional) set REDIS_HOST to activate the Redis-based async task worker
-    REDIS_HOST: 100.122.41.16
+    REDIS_HOST: 100.122.41.16 # optional, enables persistence
 ```
+
+> Set `BING_SEARCH_API_KEY` inside the referenced environment file. Without Redis, the conversation APIs keep state only in memory and will reset on restart.
+
+## Deep-Research Endpoint
 
 ### Request
 
+`POST /deep-research`
+
 ```sh
-curl --location 'https://YOUR_STORM_ADDR/deep-research' \
-  --header 'Content-Type: application/json' \
-  --header 'Authorization: Bearer YOUR_OPENAI_API_KEY' \
-  --data '{
-      "prompt": "YOUR QUERY"
-  }'
+curl --location 'https://YOUR_STORM_HOST/deep-research' \
+    --header 'Content-Type: application/json' \
+    --header 'Authorization: Bearer YOUR_API_KEY' \
+    --data '{"prompt": "Explain the history of the Silk Road"}'
 ```
 
 ### Response
 
 ```json
 {
-    "article": "# summary\n\nBlack holes are some of the most fascinating and mysterious phenomena in the universe, defined by a gravitational force so strong that nothing, not even light, can escape their influence. They are typically categorized into three main types based on their mass: stellar black holes, which form from the remnants of massive stars; supermassive black holes, found at the centers of galaxies; and intermediate-mass black holes, which bridge the gap between the other two categories. A proposed fourth category, primordial black holes, is theorized to have formed in the early universe. The study of black holes is critical for understanding fundamental aspects of physics, including the nature of space and time, and the universe's evolution.\nThe growth of black holes is primarily attributed to two mechanisms: accretion of surrounding matter and mergers with other black holes. When a black hole attracts nearby material, it forms an accretion disk, where matter spirals inward, emitting radiation that can be detected across various wavelengths. Interestingly, as objects approach a black hole, time appears to slow down due to gravitational time dilation, creating the illusion that they never fully cross the event horizon from the perspective of distant observers. This phenomenon has significant implications for our understanding of black holes and raises questions about their role in the cosmos.\nControversies in black hole research revolve around their growth mechanisms and their relationship with dark energy, particularly in \"dead\" galaxies where supermassive black holes continue to grow despite a lack of available material. Some theories suggest that black holes might be interconnected with cosmic expansion, potentially influencing the dynamics of the universe. Furthermore, the challenges associated with directly observing black holes and their accretion processes have fueled ongoing debates about their nature and the laws governing their behavior.\nAs observational techniques and theoretical frameworks continue to evolve, the study of black holes remains a dynamic and vital area of astrophysical research, with implications that extend beyond astronomy and into the very fabric of physics itself.\n\n# The Nature of Black Holes\n\nBlack holes are among the most enigmatic objects in the universe, characterized by a gravitational pull so intense that not even light can escape their grasp. The boundary around a black hole, known as the event horizon, marks the point beyond which the escape velocity exceeds the speed of light, rendering any matter or radiation that crosses it permanently trapped[1]. Black holes can be categorized into three primary types based on their mass: stellar, supermassive, and intermediate-mass black holes, with a potential fourth category of primordial black holes proposed to exist from the early universe[2].\n\n## Types of Black Holes\n\n### Stellar Black Holes\n\nStellar black holes form from the remnants of massive stars that undergo gravitational collapse after exhausting their nuclear fuel. When such a star experiences a supernova explosion, the core collapses, leading to the creation of a black hole if the remaining mass exceeds a critical threshold (about three times that of the Sun)[3]. Typically, stellar black holes have masses ranging from three to around 100 solar masses and are found throughout the Milky Way galaxy[4].\n\n### Supermassive Black Holes\n\nSupermassive black holes, which reside at the centers of most large galaxies, including our own Milky Way, can possess masses ranging from hundreds of thousands to billions of solar masses[1]. The formation mechanisms of these colossal entities remain a topic of active research, with theories suggesting they may arise from direct collapse of massive gas clouds, mergers of smaller black holes, or rapid accretion of gas and dust in the early universe[3].\n\n### Intermediate-Mass Black Holes\n\nIntermediate-mass black holes, although rarer and less understood, are believed to bridge the gap between stellar and supermassive black holes, with masses ranging from hundreds to tens of thousands of solar masses[2]. Their formation may involve the merging of stellar-mass black holes in dense environments or the direct collapse of gas clouds[3].\n\n## The Growth of Black Holes\n\nBlack holes grow primarily through a process known as accretion, where they attract and consume nearby matter, including gas from stars that venture too close[4]. This matter forms an accretion disk around the black hole, a swirling mass of gas that heats up and emits radiation across various wavelengths, making black holes detectable[5]. Additionally, black holes can grow by merging with other black holes, a process that contributes significantly to their mass over time[4].\nInterestingly, to an external observer, the process of an object falling into a black hole appears to unfold slowly due to the effects of time dilation. As the object approaches the event horizon, it seems to redshift and asymptotically approach the boundary without ever crossing it in any observable timeframe, leading to the illusion that the black hole does not consume anything at all[6]. This intriguing interplay of time and gravity exemplifies the complex nature of black holes and their profound implications for our understanding of the universe[5].\n\n# The Accretion Process\n\nAccretion is the process by which a massive central body, such as a black hole, accumulates matter from its surroundings, leading to significant increases in its mass and the emission of radiation. This process is primarily facilitated by the formation of an accretion disk, a structure formed by diffuse material in orbital motion around the central object. As matter falls towards the black hole, it cannot travel in a straight line due to its angular momentum; instead, it flattens into a disk shape as it spirals inward[7][8].\n\n## Formation of Accretion Disks\n\nAn accretion disk forms when the infalling matter possesses enough rotational momentum that prevents it from directly falling into the black hole. In directions perpendicular to the rotation axis, the matter tends to flatten due to this rotation. As it contracts toward the gravitational center, thermal pressure builds up, which resists further compression[7]. The disk's thickness depends on the balance between thermal pressure and gravitational forces; when thermal pressure is small relative to gravity, the disk becomes geometrically thin[7].\n\n## Energy Dynamics and Radiation\n\nAs matter spirals inward in an accretion disk, gravitational and frictional forces compress the material, increasing its temperature and leading to the emission of electromagnetic radiation. The emitted radiation spans a range of wavelengths, depending on the mass of the central object; for instance, disks around neutron stars and black holes emit X-rays due to their high temperatures, often reaching several million kelvins[7][9]. This radiation occurs because the process of accretion is extremely efficient in converting gravitational energy into thermal energy, making it roughly 30 times more effective than nuclear fusion in producing light and heat[9].\n\n## Accretion Rates and Disk Types\n\nThe behavior of an accretion disk can vary significantly based on the accretion rate. At high accretion rates, disks can be radiatively inefficient, where the energy produced exceeds the amount that can be radiated away, leading to the formation of powerful jets and significant luminosity[10]. Conversely, at low accretion rates, the disk may exhibit either a radiatively efficient state (thin disk) or a less efficient state (two-temperature state). The mechanisms triggering transitions between these states remain poorly understood but are evidenced in various astrophysical contexts, such as X-ray binaries[10].\n\n## Magnetic Fields and Jet Formation\n\nAccretion disks are often threaded by magnetic fields, which can be either advected from the interstellar medium or generated within the disk itself. Strong magnetic fields, on the order of hundreds of Gauss, are necessary for launching jets along the rotation axis of the disk[11]. However, challenges exist in maintaining these magnetic fields as they are carried inward; the magnetic field tends to diffuse away faster than the matter can accrete[11]. Effective modeling of these interactions is crucial for understanding the dynamics of accretion disks and their associated phenomena.\n\n# Growth of Black Holes\n\nThe growth of black holes, particularly supermassive black holes found at the centers of galaxies, remains a significant area of study in astrophysics. These colossal entities, which can have masses ranging from 1 million to 10 billion times that of the Sun, challenge our understanding of how they formed and evolved over the 14 billion years since the Big Bang[12][5].\n\n## Mechanisms of Growth\n\nAstrophysicists have proposed several mechanisms through which black holes can increase in mass. The two primary theories suggest that black holes grow either by accreting vast amounts of gas or by capturing and consuming stars. The former mechanism involves gas from the surrounding space falling into the black hole, forming an accretion disk. This disk is characterized by friction and magnetic forces, which heat the gas to high temperatures, causing it to emit powerful X-rays and radio waves detectable by astronomers[13][7].\nAnother intriguing aspect of black hole growth is the role of binary star systems. When a binary pair of stars orbits each other, the interaction with a black hole can be particularly effective. One of the stars can be ripped away and captured by the black hole, contributing to its growth without requiring the binary system to get very close to the black hole[12].\n\n## Accretion Processes\n\nGas falling toward a black hole is often organized into an accretion disk, a structure that facilitates the mass gain process. As material in the disk spirals inward, it loses energy and angular momentum, heating up and emitting electromagnetic radiation, particularly in the X-ray spectrum when near black holes[11]. In cases where the accretion rate is low, alternative models such as Advection-Dominated Accretion Flows (ADAFs) come into play, where the accretion is driven more by heat captured in matter rather than radiative cooling[14].\n\n## Challenges in Observing Growth\n\nAlthough researchers have identified various growth mechanisms, proving these theories requires more advanced observational tools. Scientists are particularly interested in detecting signatures of small stars being captured by supermassive black holes and the phenomenon of hypervelocity stars—stars that are ejected from galaxies at extremely high speeds after interactions with black holes[12]. The immense gravitational influence of supermassive black holes also creates complex dynamics in their surrounding environments, making direct observations challenging[5][13].\n\n# Theoretical Implications\n\nThe study of black holes raises profound questions about the nature of space, time, and matter, particularly regarding their growth mechanisms and their relationship with the Universe at large. A significant theoretical advancement in this area is the concept of **cosmological coupling**, which posits that black holes may grow in tandem with the expansion of the Universe. As astrophysicist Kevin Croker explains, if black holes contain dark energy, they could couple with the expanding Universe, potentially driving its acceleration.[15] This hypothesis suggests that black holes are not merely passive consumers of matter but may play an active role in shaping cosmic dynamics.\n\n## Black Holes in “Dead” Galaxies\n\nEmpirical evidence supporting cosmological coupling has emerged from observations of supermassive black holes residing in \"dead\" galaxies—galaxies that no longer produce stars and are devoid of significant material for black hole consumption. Surprisingly, these black holes continue to grow, which cannot be explained by conventional growth mechanisms.[15] This unexpected expansion implies that black holes might derive their growth from sources beyond their immediate surroundings, possibly linked to the broader cosmic expansion.\n\n## The Birth of Black Holes and Dark Energy\n\nFurther insights into black holes and their potential connection to dark energy arise from the process of black hole formation. As massive stars undergo gravitational collapse, researchers speculate that normal matter may be converted into dark energy during this process. This conversion could contribute to the overall dark energy present in the Universe, thereby linking the birth of black holes to the expansion of the cosmos.[15] Duncan Farrah, an astrophysicist, notes the consistency between the formation of new black holes and the increase of dark energy in the Universe, suggesting a profound interconnectedness between these phenomena.\n\n## Implications for the Missing Matter Problem\n\nThe exploration of black hole growth mechanisms also intersects with the longstanding **missing matter problem** in astrophysics. Various theories have been proposed to explain how supermassive black holes can exceed the conventional growth expectations based on their environments. While several ideas exist, none have yet established a definitive framework for understanding this phenomenon.[16] Concepts like the **complementarity principle** offer alternative perspectives on the nature of black holes and matter interaction, suggesting that matter falling into a black hole may be thermalized and emitted as Hawking radiation, thereby preserving information about its state.[17]\n\n## Quantum Gravity and Event Horizons\n\nTheoretical models concerning black holes often necessitate a comprehensive understanding of **quantum gravity**, which is essential for fully describing local event horizons and the behavior of matter near singularities.[18] Candidate theories, such as M-theory and loop quantum gravity, aim to reconcile quantum mechanics with general relativity, particularly in extreme environments like those surrounding black holes. The implications of these theories extend beyond mere academic inquiry; they offer potential resolutions to some of the most fundamental questions in physics, including the fate of information swallowed by black holes and the true nature of spacetime near their singularities.[19]\n\n# Observational Techniques\n\nObservational techniques for studying black holes have evolved significantly with advancements in technology and instrumentation. Researchers are utilizing a variety of tools to gather data on black hole behavior, growth, and the surrounding cosmic environment.\n\n## Telescopes and Instruments\n\nNew observational instruments, such as the Dark Energy Spectroscopic Instrument (DESI), are instrumental in measuring cosmic expansion and black hole growth rates. These tools aim to provide more precise data, enhancing our understanding of dark energy's influence on black holes and the universe at large[15]. Future space telescopes are expected to further facilitate these observations, allowing scientists to observe black holes and their accretion processes more directly.\n\n## Gravitational Wave Detectors\n\nGravitational wave observatories like LIGO and Virgo have revolutionized our understanding of black hole mergers. These detectors capture gravitational waves produced by colliding black holes, enabling researchers to infer properties such as the mass distribution of primordial black holes[8][11]. Upcoming gravitational wave detectors, such as the Laser Interferometer Space Antenna (LISA), will probe the stochastic background of gravitational waves, providing insight into black hole populations and their interactions[8].\n\n## Imaging Techniques\n\nThe Event Horizon Telescope (EHT) represents a significant leap in observational capabilities, successfully capturing the first image of Sagittarius A*, the supermassive black hole at the center of the Milky Way[20]. This array of radio observatories acts as a planet-sized telescope, allowing scientists to observe the shadow of a black hole against the backdrop of orbiting gas. The imaging technique capitalizes on the bending of light due to the intense gravitational field of black holes, thus providing visual evidence of their existence.\n\n## The Role of Simulations\n\nHigh-performance computing plays a critical role in modeling black hole behavior and accretion flows. For example, simulations run on supercomputers, like those conducted by researchers at the Texas Advanced Computing Center, help in understanding the complex dynamics of accretion disks around black holes. These simulations reveal how energy is released and how magnetic fields may interact with the accretion processes[10][18].\n\n## Future Directions\n\nAs observational techniques continue to advance, scientists expect to gather more data that could lead to a deeper understanding of black hole growth and the nature of the universe. New proposed experiments, including MeV gamma-ray telescopes and wide-field gamma-ray observatories, aim to explore previously uncharted aspects of black hole physics, such as primordial black holes and their contributions to gravitational waves and cosmic structure[8].",
-    "references": {
-        "url_to_unified_index": {
-            "https://nasaspacenews.com/2024/11/are-black-holes-secretly-powering-the-expansion-of-the-universe/": 15,
-            "https://en.wikipedia.org/wiki/Primordial_black_hole": 8,
-            "https://new.nsf.gov/blackholes/how-are-black-holes-studied": 20,
-            "https://en.wikipedia.org/wiki/Accretion_disk": 11,
-            "https://ned.ipac.caltech.edu/level5/Sept14/Begelman/Begelman3.html": 10,
-            "https://www.nasa.gov/universe/nasa-led-study-explains-decades-of-black-hole-observations/": 18,
-            "https://www.astronomy.com/science/how-black-holes-grow/": 12,
-            "https://rarest.org/general/largest-black-holes-in-the-known-universe": 5,
-            "https://www.stsci.edu/~marel/black_holes/encyc_mod3_q9.html": 13,
-            "https://www.britannica.com/science/accretion-disk": 7,
-            "https://www.mdpi.com/2571-712X/6/2/33": 14,
-            "https://www.nasa.gov/universe/what-are-black-holes/": 1,
-            "https://science.nasa.gov/universe/black-holes/anatomy/": 4,
-            "https://astronomy.stackexchange.com/questions/2441/does-matter-accumulate-just-outside-the-event-horizon-of-a-black-hole": 6,
-            "https://coffeetablescience.com/black-hole-types/": 3,
-            "https://science.nasa.gov/universe/black-holes/types/": 2,
-            "https://www.einstein-online.info/en/spotlight/accretion/": 9,
-            "https://physics.stackexchange.com/questions/167250/is-there-a-limit-as-to-how-fast-a-black-hole-can-grow": 16,
-            "https://en.wikipedia.org/wiki/Event_horizon": 17,
-            "https://www.space.com/black-holes-event-horizon-explained.html": 19
-        },
-        "url_to_info": {
-            "https://nasaspacenews.com/2024/11/are-black-holes-secretly-powering-the-expansion-of-the-universe/": {
-                "url": "https://nasaspacenews.com/2024/11/are-black-holes-secretly-powering-the-expansion-of-the-universe/",
-                "description": "The Universe is growing. And not just at a steady pace—it’s expanding faster and faster. For decades, scientists have struggled to understand the mysterious force behind this accelerated expansion, often attributing it to something called dark energy. Now, however, new research suggests that black holes, those enigmatic cosmic giants, could be contributing to this growth",
-                "snippets": [
-                    "The concept of cosmological coupling is groundbreaking. Imagine the expansion of the Universe being directly connected to the growth of black holes. This means that as the Universe expands, so do black holes—suggesting an intimate link between these dense matter concentrations and the cosmic landscape around them. According to this theory, black holes don’t just consume matter; they grow in sync with the Universe’s expansion.\nKevin Croker, an astrophysicist from Arizona State University, explains that “if black holes contain dark energy, they can couple to and grow with the expanding Universe, causing its growth to accelerate.” The math behind this coupling suggests that black holes could be more than just cosmic endpoints for stars; they might be engines driving the expansion of the Universe.\nEvidence: Growth of Black Holes in “Dead” Galaxies",
-                    "While the theory is enticing, it’s still in its early stages. To transform it from an intriguing idea into accepted science, more observational data and experiments are needed. Croker, Farrah, and their teams are now looking to test their predictions with more powerful telescopes and instruments, aiming to observe these processes in action. As Tarlé, a physicist at the University of Michigan, puts it, “This is an experimental question now.”\nNew tools such as the Dark Energy Spectroscopic Instrument (DESI) and upcoming space telescopes will enable scientists to gather more precise data on black hole growth rates, cosmic expansion, and dark energy’s role in the process. If the data continues to support cosmological coupling, we might soon have a much clearer picture of the Universe’s fate.\nConclusion: A New Perspective on the Universe’s Fate",
-                    "The cosmological coupling theory also provides insights into how black holes might be connected to dark energy right from their formation. As massive stars reach the end of their life cycles, they undergo gravitational collapse, forming black holes. Researchers suggest that during this collapse, normal matter might be converted into dark energy within black holes. This transformation could add dark energy to the Universe, supporting the theory that black holes contribute directly to cosmic expansion.\nAstrophysicist Duncan Farrah from the University of Hawai’i notes, “The two phenomena were consistent with each other – as new black holes were made in the deaths of massive stars, the amount of dark energy in the Universe increased in the right way.” This connection, if verified, could help explain why black holes seem to influence the Universe on such an immense scale.\nImplications for the Missing Matter Problem",
-                    "One of the first pieces of evidence for cosmological coupling came from studying supermassive black holes within “dead” galaxies. These galaxies no longer produce stars, and their black holes are starved of fuel. Under normal conditions, black holes in such galaxies should stop growing once their host galaxies run out of resources. However, scientists found that these black holes were still expanding, and the increase could not be attributed to any known growth mechanism. This surprising observation supports the idea that black holes could grow in ways unrelated to nearby material consumption—possibly through coupling with the Universe’s expansion.\nThe Birth of Black Holes and Dark Energy"
-                ],
-                "title": "Are Black Holes Secretly Powering the Expansion of the Universe?",
-                "meta": {
-                    "query": "environmental factors influencing black hole growth"
-                },
-                "citation_uuid": -1
-            },
-            "https://en.wikipedia.org/wiki/Primordial_black_hole": {
-                "url": "https://en.wikipedia.org/wiki/Primordial_black_hole",
-                "description": "Depending on the model, primordial black holes could have initial masses ranging from 10 −8 kg [17] (the so-called Planck relics) to more than thousands of solar masses. However, primordial black holes originally having masses lower than 10 11 kg would not have survived to the present due to Hawking radiation, which causes complete evaporation in a time much shorter than the age of the ...",
-                "snippets": [
-                    "- Hydrogen Intensity and Real-time Analysis eXperiment (HIRAX)\n- CHORD (Successor to CHIME)\nMeV Gamma-Ray Telescopes\n- Since the MeV gamma-ray band has yet to be explored, proposed experiments could place tighter constraints on the abundance of PBHs in the asteroid-mass range. Some examples of the proposed telescopes include:\n- AdEPT\n- AMEGO\n- All-Sky ASTROGAM\n- GECCO\n- GRAMS\n- MAST\n- PANGU\nGeV and TeV Gamma-Ray Observatories\n- Wide field of view survey observatory\n- PBHs in the mass range of ~ 5×1019 solar masses would be producing TeV gamma-rays due to evaporation. Since these would occur in isotropic bursts across the sky, wide field survey observatories would be ideal to searching for these, a few examples could be:\n- FGST’s LAT\n- High Altitude Water Cherenkov Experiment (HAWC)\n- Southern Wide-field Gamma-ray Observatory (SWGO)",
-                    "- LIGO, VIRGO and future gravitational waves detectors will detect new black hole merging events, from which one could reconstruct the mass distribution of primordial black holes. These detectors could allow distinguishing unambiguously between primordial or stellar origins if merging events involving black holes with a mass lower than 1.4 solar mass are detected. Another way would be to measure the large orbital eccentricity of primordial black hole binaries.\n- Gravitational wave detectors, such as the Laser Interferometer Space Antenna (LISA) and pulsar timing arrays, will also probe the stochastic background of gravitational waves emitted by primordial black hole binaries when they are still orbiting relatively far from each other.\n- New detections of faint dwarf galaxies, and observations of their central star clusters, could be used to test the hypothesis that these dark matter-dominated structures contain primordial black holes in abundance.",
-                    "- Mazumdar, Anupam; White Graham. 2019. Review of cosmic phase transitions: their significance and experimental signatures. \n- ^ Zel'dovitch & Novikov (14 March 1966). \"The Hypothesis of Cores Retarded During Expansion and the Hot Cosmological Model\". Soviet Astronomy. 10 (4): 602–603. Bibcode:1966AZh....43..758Z.\n- ^ Hawking, Stephen W. (1971). \"Gravitationally collapsed objects of very low mass\". Mon. Not. R. Astron. Soc. 152: 75. Bibcode:1971MNRAS.152...75H. doi:10.1093/mnras/152.1.75.\n- ^ a b c d Liu, Boyuan; Bromm, Volker (2022-09-27). \"Accelerating Early Massive Galaxy Formation with Primordial Black Holes\". The Astrophysical Journal Letters. 937 (2): L30. arXiv:2208.13178. Bibcode:2022ApJ...937L..30L. doi:10.3847/2041-8213/ac927f. ISSN 2041-8205. S2CID 252355487.",
-                    "[edit]Axion inflation is a theoretical model in which the axion acts as an inflaton field. Because of the time period it is created at, the field is oscillating at its minimal potential energy. These oscillations are responsible for the energy density fluctuations in the early universe. For a review of production mechanisms arising from various models of inflation, see Ref.\nReheating\n[edit]Reheating is the transitory process between the inflationary and the hot, dense, radiation-dominated period. During this time the inflaton field decays into other particles. These particles begin to interact in order to reach thermal equilibrium. However, if this process is incomplete it creates density fluctuations, and if these are big enough they could be responsible for the formation of PBH.\nCosmological phase transitions",
-                    "- ^ Sasaki, M.; Suyama, T.; Tanaki, T. (2016). \"Primordial Black Hole Scenario for the Gravitational-Wave Event GW150914\". Physical Review Letters. 117 (6): 061101. arXiv:1603.08338. Bibcode:2016PhRvL.117f1101S. doi:10.1103/PhysRevLett.117.061101. PMID 27541453. S2CID 7362051.\n- ^ \"Did Gravitational Wave Detector Find Dark Matter?\". Johns Hopkins University. June 15, 2016. Retrieved June 20, 2015.\n- ^ Khalouei, E.; Ghodsi, H.; Rahvar, S.; Abedi, J. (2021-04-02). \"Possibility of primordial black holes as the source of gravitational wave events in the advanced LIGO detector\". Physical Review D. 103 (8): 084001. arXiv:2011.02772. Bibcode:2021PhRvD.103h4001K. doi:10.1103/PhysRevD.103.084001. S2CID 226254110.\n- ^ Kashlinsky, A. (2016). \"LIGO gravitational wave detection, primordial black holes and the near-IR cosmic infrared background anisotropies\". The Astrophysical Journal. 823 (2): L25. arXiv:1605.04023. Bibcode:2016ApJ...823L..25K. doi:10.3847/2041-8205/823/2/L25. S2CID 118491150."
-                ],
-                "title": "Primordial black hole - Wikipedia",
-                "meta": {
-                    "query": "primary mechanisms for black hole growth"
-                },
-                "citation_uuid": -1
-            },
-            "https://new.nsf.gov/blackholes/how-are-black-holes-studied": {
-                "url": "https://new.nsf.gov/blackholes/how-are-black-holes-studied",
-                "description": "The Galactic Center Group studies the black hole at the heart of the Milky Way and how it impacts its surroundings, a multi-decade effort to better understand how galaxies formed and evolved. In 2020, Ghez shared the Nobel Prize in Physics for her discoveries, which confirmed the presence of a black hole at our galactic center.",
-                "snippets": [
-                    "This is the first image of Sagittarius A*, or Sgr A*, the supermassive black hole at the center of our galaxy. It's the first direct visual evidence of the presence of this black hole. It was captured by the Event Horizon Telescope (EHT), an array which links together eight existing radio observatories across the planet to form a single Earth-sized virtual telescope. The telescope is named after the \"event horizon\", the boundary of the black hole beyond which no light can escape.\nAlthough we cannot see the event horizon itself, because it cannot emit light, glowing gas orbiting around the black hole reveals a telltale signature: a dark central region, called a \"shadow,\" surrounded by a bright ring-like structure. The new view captures light bent by the powerful gravity of the black hole, which is 4 million times more massive than our sun. The image of the Sgr A* black hole is an average of the different images that the EHT Collaboration has extracted from its 2017 observations.",
-                    "Astronomers capture first image of a black hole\nNational Science Foundation and Event Horizon Telescope contribute to paradigm-shifting observations of the gargantuan black hole.\nRead moreFor the full suite of images, animations, explanatory videos, and other multimedia content from the press event, see the Images, video, and educational resources page\nCredit: T. Pyle/Caltech/MIT/LIGO Lab\nA century ago, Albert Einstein predicted gravitational waves, ripples in the fabric of space-time that result from the universe's most violent phenomena. In 2016, NSF researchers using one of the most precise instruments ever made—the NSF Laser Interferometer Gravitational-wave Observatory (LIGO)—announced the historic first detection of gravitational waves, the violent remnant of black holes colliding more than 1.3 billion years ago.\nCredit: Nicolle R. Fuller, National Science Foundation"
-                ],
-                "title": "How are black holes studied? - Exploring Black Holes - NSF",
-                "meta": {
-                    "query": "observational studies of black holes and their environments"
-                },
-                "citation_uuid": -1
-            },
-            "https://en.wikipedia.org/wiki/Accretion_disk": {
-                "url": "https://en.wikipedia.org/wiki/Accretion_disk",
-                "description": "The hot accretion disc of a black hole, showing the relativistic effects imposed on light when it is emitted in regions subject to extreme gravitation.This image is the result of NASA simulations and shows a view from outside the horizon of a Schwarzschild black hole.. An accretion disk is a structure (often a circumstellar disk) formed by diffuse material [a] in orbital motion around a ...",
-                "snippets": [
-                    "Using Kramers' opacity law it is found that\nwhere and are the mid-plane temperature and density respectively. is the accretion rate, in units of , is the mass of the central accreting object in units of a solar mass, , is the radius of a point in the disk, in units of , and , where is the radius where angular momentum stops being transported inward.\nThe Shakura–Sunyaev α-disk model is both thermally and viscously unstable. An alternative model, known as the -disk, which is stable in both senses assumes that the viscosity is proportional to the gas pressure . In the standard Shakura–Sunyaev model, viscosity is assumed to be proportional to the total pressure since .",
-                    "[edit]Balbus and Hawley (1991) proposed a mechanism which involves magnetic fields to generate the angular momentum transport. A simple system displaying this mechanism is a gas disk in the presence of a weak axial magnetic field. Two radially neighboring fluid elements will behave as two mass points connected by a massless spring, the spring tension playing the role of the magnetic tension. In a Keplerian disk the inner fluid element would be orbiting more rapidly than the outer, causing the spring to stretch. The inner fluid element is then forced by the spring to slow down, reduce correspondingly its angular momentum causing it to move to a lower orbit. The outer fluid element being pulled forward will speed up, increasing its angular momentum and move to a larger radius orbit. The spring tension will increase as the two fluid elements move further apart and the process runs away.",
-                    "- ^ Lynden-Bell, D. (1969). \"Galactic Nuclei as Collapsed Old Quasars\". Nature. 280 (5207): 690–694. Bibcode:1969Natur.223..690L. doi:10.1038/223690a0. S2CID 4164497.\n- ^ Gurzadyan, V. G.; Ozernoy, L. M. (1979). \"Accretion on massive black holes in galactic nuclei\". Nature. 280 (5719): 214–215. Bibcode:1979Natur.280..214G. doi:10.1038/280214a0. S2CID 4306883.\n- ^ Massi, Maria. \"Accretion\" (PDF). Archived (PDF) from the original on 2020-12-02. Retrieved 2018-07-22.\n- ^ Weizsäcker, C. F. (1948). \"Die Rotation Kosmischer Gasmassen\" [The rotation of cosmic gas masses]. Zeitschrift für Naturforschung A (in German). 3 (8–11): 524–539. Bibcode:1948ZNatA...3..524W. doi:10.1515/zna-1948-8-1118.\n- ^ a b Shakura, N. I.; Sunyaev, R. A. (1973). \"Black Holes in Binary Systems. Observational Appearance\". Astronomy and Astrophysics. 24: 337–355. Bibcode:1973A&A....24..337S.",
-                    "When the accretion rate is sub-Eddington and the opacity very low, an ADAF (advection dominated accretion flow) is formed. This type of accretion disk was predicted in 1977 by Ichimaru. Although Ichimaru's paper was largely ignored, some elements of the ADAF model were present in the influential 1982 ion-tori paper by Rees, Phinney, Begelman, and Blandford. ADAFs started to be intensely studied by many authors only after their rediscovery in the early 1990s by Popham and Narayan in numerical models of accretion disk boundary layers. Self-similar solutions for advection-dominated accretion were found by Narayan and Yi, and independently by Abramowicz, Chen, Kato, Lasota (who coined the name ADAF), and Regev.  Most important contributions to astrophysical applications of ADAFs have been made by Narayan and his collaborators. ADAFs are cooled by advection (heat captured in matter) rather than by radiation",
-                    "[edit]Accretion disks are usually assumed to be threaded by the external magnetic fields present in the interstellar medium. These fields are typically weak (about few micro-Gauss), but they can get anchored to the matter in the disk, because of its high electrical conductivity, and carried inward toward the central star. This process can concentrate the magnetic flux around the centre of the disk giving rise to very strong magnetic fields. Formation of powerful astrophysical jets along the rotation axis of accretion disks requires a large scale poloidal magnetic field in the inner regions of the disk.",
-                    "Accretion disk\nAn accretion disk is a structure (often a circumstellar disk) formed by diffuse material[a] in orbital motion around a massive central body. The central body is most frequently a star. Friction, uneven irradiance, magnetohydrodynamic effects, and other forces induce instabilities causing orbiting material in the disk to spiral inward toward the central body. Gravitational and frictional forces compress and raise the temperature of the material, causing the emission of electromagnetic radiation. The frequency range of that radiation depends on the central object's mass. Accretion disks of young stars and protostars radiate in the infrared; those around neutron stars and black holes in the X-ray part of the spectrum. The study of oscillation modes in accretion disks is referred to as diskoseismology.\nManifestations",
-                    "Analytic models of sub-Eddington accretion disks (thin disks, ADAFs)",
-                    "Such magnetic fields may be advected inward from the interstellar medium or generated by a magnetic dynamo within the disk. Magnetic fields strengths at least of order 100 Gauss seem necessary for the magneto-centrifugal mechanism to launch powerful jets. There are problems, however, in carrying external magnetic flux inward toward the central star of the disk. High electric conductivity dictates that the magnetic field is frozen into the matter which is being accreted onto the central object with a slow velocity. However, the plasma is not a perfect electric conductor, so there is always some degree of dissipation. The magnetic field diffuses away faster than the rate at which it is being carried inward by accretion of matter. A simple solution is assuming a viscosity much larger than the magnetic diffusivity in the disk"
-                ],
-                "title": "Accretion disk - Wikipedia",
-                "meta": {
-                    "query": "How does accretion work in black holes?"
-                },
-                "citation_uuid": -1
-            },
-            "https://ned.ipac.caltech.edu/level5/Sept14/Begelman/Begelman3.html": {
-                "url": "https://ned.ipac.caltech.edu/level5/Sept14/Begelman/Begelman3.html",
-                "description": "The dynamical properties of black hole accretion flows depend on whether the gas radiates efficiently or not, but do not depend on the mechanisms that determine radiative efficiency. From an observational point of view, however, these details are crucial because radiatively inefficient flows can be either very faint or, paradoxically, very ...",
-                "snippets": [
-                    "At high (> E) and intermediate (α2 E < < E) accretion rates, the thermal state of accretion is uniquely determined by . But flows with low accretion rates may exist in either a radiatively efficient (thin disk) or inefficient (two-temperature) state. It is not understand what would trigger a thin disk in this regime to transition to the radiatively inefficient state, or vice-versa, but there is evidence that such transitions do occur in X-ray binaries.",
-                    "It is important to note that the energy dissipated locally in an accretion disk is not the same as the gravitational binding energy liberated locally. Far from the black hole where the angular momentum is close to the Keplerian value, the dissipation rate is three times the local rate of energy liberation because two-thirds of the dissipated energy is transported from closer in by the same torques that transport angular momentum outward. Overall energy conservation is maintained because the dissipation rate close to the ISCO is lower than the local rate at which energy is liberated. This means that the outer parts of an accretion disk will accumulate internal energy and becomes unbound unless at least two-thirds of the dissipated energy is radiated away.",
-                    ". All of them require some unspecified mechanism for separating accreting matter from outflowing mass, energy and angular momentum. Despite these uncertainties, various numerical simulations  suggest that such a separation can take place naturally.",
-                    "Thus, accretion flows with high accretion rates are radiatively inefficient because they liberate more energy than they can radiate, but they are also very luminous because they radiate at close to the Eddington limit. Such flows are strongly dominated by radiation pressure and should be modeled using an adiabatic index of 4/3.",
-                    "The presumption for disklike flows is that the accretion rate adjusts itself so that the circulation, outflow, convection — or whatever it is that relieves the energy crisis — is able to carry away any accretion energy that isn't lost to radiation. This is possible because the radial density and pressure gradients are rather flat, giving the outer flow a high \"carrying capacity\" for excess energy, compared to the inner flow where most of this energy is liberated. But this presumption fails in the case of starlike accretion flows, where the density and pressure profiles are forced to steepen in order to keep the gas bound while satisfying dynamical constraints. This means that matter is more centrally concentrated around the black hole in a starlike flow, and if this matter is swallowed with an energy efficiency typical for the ISCO it will liberate much more energy than can be carried away by the outer parts of the flow."
-                ],
-                "title": "Accreting Black Holes - Mitchell C. Begelman",
-                "meta": {
-                    "query": "conditions for efficient accretion of gas onto a black hole"
-                },
-                "citation_uuid": -1
-            },
-            "https://www.nasa.gov/universe/nasa-led-study-explains-decades-of-black-hole-observations/": {
-                "url": "https://www.nasa.gov/universe/nasa-led-study-explains-decades-of-black-hole-observations/",
-                "description": "The researchers are extending the results to spinning black holes, where rotation pulls the inner edge of the disk further inward and conditions become even more extreme. They also plan a detailed comparison of their results to the wealth of X-ray observations now archived by NASA and other institutions. Black holes are the densest objects known.",
-                "snippets": [
-                    "“Black holes are truly exotic, with extraordinarily high temperatures, incredibly rapid motions and gravity exhibiting the full weirdness of general relativity,” Krolik said. “But our calculations show we can understand a lot about them using only standard physics principles.”\nThe study was based on a non-rotating black hole. The researchers are extending the results to spinning black holes, where rotation pulls the inner edge of the disk further inward and conditions become even more extreme. They also plan a detailed comparison of their results to the wealth of X-ray observations now archived by NASA and other institutions.\nBlack holes are the densest objects known. Stellar-mass black holes form when massive stars run out of fuel and collapse, crushing up to 20 times the sun’s mass into compact objects less than 75 miles (120 kilometers) wide.\nBy Francis Reddy\nNASA’s Goddard Space Flight Center, Greenbelt, Md.",
-                    "A new study by astronomers at NASA, Johns Hopkins University and the Rochester Institute of Technology confirms long-held suspicions about how stellar-mass black holes produce their highest-energy light.\n“Our work traces the complex motions, particle interactions and turbulent magnetic fields in billion-degree gas on the threshold of a black hole, one of the most extreme physical environments in the universe,” said lead researcher Jeremy Schnittman, an astrophysicist at NASA’s Goddard Space Flight Center in Greenbelt, Md.\nBy analyzing a supercomputer simulation of gas flowing into a black hole, the team finds they can reproduce a range of important X-ray features long observed in active black holes.",
-                    "Running on the Ranger supercomputer at the Texas Advanced Computing Center located at the University of Texas in Austin, Noble’s simulation used 960 of Ranger’s nearly 63,000 central processing units and took 27 days to complete.\nOver the years, improved X-ray observations provided mounting evidence that hard X-rays originated in a hot, tenuous corona above the disk, a structure analogous to the hot corona that surrounds the sun.\n“Astronomers also expected that the disk supported strong magnetic fields and hoped that these fields might bubble up out of it, creating the corona,” Noble explained. “But no one knew for sure if this really happened and, if it did, whether the X-rays produced would match what we observe.”",
-                    "Working with Julian Krolik, a professor at Johns Hopkins University in Baltimore, and Scott Noble, a research scientist at the Rochester Institute of Technology in Rochester, N.Y., Schnittman developed a process for modeling the inner region of a black hole’s accretion disk, tracking the emission and movement of X-rays, and comparing the results to observations of real black holes.\nNoble developed a computer simulation solving all of the equations governing the complex motion of inflowing gas and its associated magnetic fields near an accreting black hole. The rising temperature, density and speed of the infalling gas dramatically amplify magnetic fields threading through the disk, which then exert additional influence on the gas.\nThe result is a turbulent froth orbiting the black hole at speeds approaching the speed of light. The calculations simultaneously tracked the fluid, electrical and magnetic properties of the gas while also taking into account Einstein’s theory of relativity."
-                ],
-                "title": "NASA-Led Study Explains Decades of Black Hole Observations",
-                "meta": {
-                    "query": "observational studies of black holes and their environments"
-                },
-                "citation_uuid": -1
-            },
-            "https://www.astronomy.com/science/how-black-holes-grow/": {
-                "url": "https://www.astronomy.com/science/how-black-holes-grow/",
-                "description": "The new study looked at each step in the process of a supermassive black hole eating binary stars and calculated what would be required for the process to work in terms of the rates at which ...",
-                "snippets": [
-                    "Small black holes result from the collapse of individual stars. But the centers of most galaxies, including our Milky Way, are occupied by what are popularly known as “supermassive” black holes that contain mass ranging from 1 million to 10 billion stars the size of our Sun.\nAstrophysicists long have debated how supermassive black holes grew during the 14 billion years since the universe began in a great expansion of matter and energy called the Big Bang. One side believes black holes grow larger mainly by sucking in vast amounts of gas; the other side says they grow primarily by capturing and sucking in stars.\nJust last month, other researchers published a theory that a black hole sucks in “food” by tipping its “plates” — two tilted gas disks colliding as they orbit the black hole — in a way that makes the speeding gas slow down so the black hole can swallow it.",
-                    "A binary pair of stars orbiting each other “is essentially a single object much bigger than the size of the individual stars, so it is going to interact with the black hole more efficiently,” Bromley said. “The binary doesn’t have to get nearly as close for one of the stars to get ripped away and captured.”\nBut to prove the theory will require more powerful telescopes to find three key signs: large numbers of small stars captured near supermassive black holes, more observations of stars being “shredded” by gravity from black holes, and large numbers of “hypervelocity stars” that are flung from galaxies at more than 1 million mph (1.6 million km/h) when their binary partners are captured.\nWhat does a supermassive black hole eat: gas or stars?\nBlack holes are objects in space so dense that not even light can escape their gravity, although powerful jets of light and energy can be emitted from a black hole’s vicinity as gas and stars are sucked into it."
-                ],
-                "title": "How black holes grow | Astronomy.com - Astronomy Magazine",
-                "meta": {
-                    "query": "How do black holes grow by consuming matter?"
-                },
-                "citation_uuid": -1
-            },
-            "https://rarest.org/general/largest-black-holes-in-the-known-universe": {
-                "url": "https://rarest.org/general/largest-black-holes-in-the-known-universe",
-                "description": "Black holes are some of the most mysterious and awe-inspiring objects in the universe, with some growing to unimaginable sizes. ... Understanding the Phoenix Cluster’s black hole is key to learning how supermassive black holes impact their galactic environments. IC 1101. ... it is one of the most extreme examples of how black holes can ...",
-                "snippets": [
-                    "Black holes are some of the most mysterious and awe-inspiring objects in the universe, with some growing to unimaginable sizes. These cosmic giants, particularly supermassive black holes, can contain millions to billions of times the mass of our Sun. Found at the centers of galaxies, they play a crucial role in shaping their surroundings. In this article, we’ll take a look at 12 of the largest known black holes, exploring their size, how they formed, and the remarkable features that make them so intriguing. From distant quasars to galaxies closer to home, these black holes stretch the limits of our understanding of space and time.\nTON 618",
-                    "This black hole, located in the quasar S5 0014+81, is estimated to be about 40 billion times the mass of the Sun. Its immense size allows it to warp the surrounding space-time significantly. Discovered in 2003, it is one of the most massive black holes found in the early universe, with its light originating over 12 billion light-years away. S5 0014+81 is actively feeding, its accretion disk is incredibly bright, emitting X-rays that help scientists track its growth. Although it is difficult to directly observe the black hole, the emissions from the surrounding material offer valuable clues. The size of its event horizon suggests that it has been growing for a substantial amount of time. As one of the largest quasars known, S5 0014+81 challenges our understanding of black hole formation.\nNGC 4889"
-                ],
-                "title": "12 Largest Black Holes in the Known Universe - Rarest.org",
-                "meta": {
-                    "query": "examples of black holes in different environments"
-                },
-                "citation_uuid": -1
-            },
-            "https://www.stsci.edu/~marel/black_holes/encyc_mod3_q9.html": {
-                "url": "https://www.stsci.edu/~marel/black_holes/encyc_mod3_q9.html",
-                "description": "The diet of known black holes consists mostly of gas and dust, which fill the otherwise empty space throughout the Universe. Black holes can also consume material torn from nearby stars. In fact, the most massive black holes can swallow stars whole. Black holes can also grow by colliding and merging with other black holes.",
-                "snippets": [
-                    "The diet of known black holes consists mostly of gas and dust, which fill the otherwise empty space throughout the Universe. Black holes can also consume\nmaterial torn from nearby stars. In fact, the most massive black holes can swallow stars whole. Black holes can also grow by colliding and merging with other\nblack holes. This growth process is what can reveal the presence of a black hole. As gas falls toward a black hole, it is heated to high temperatures, generating\npowerful radio waves and X-rays that can be studied by astronomers.\nThe following pages showcase the supermassive black holes in the centers of two distant galaxies that reveal their presence through their very powerful\nradio waves and X-rays:\nGas that falls into a black hole settles into a so-called accretion disk. Friction and magnetic fields in the disk cause the gas to heat and emit X-rays."
-                ],
-                "title": "How do black holes grow? - Space Telescope Science Institute",
-                "meta": {
-                    "query": "How do black holes grow by consuming matter?"
-                },
-                "citation_uuid": -1
-            },
-            "https://www.britannica.com/science/accretion-disk": {
-                "url": "https://www.britannica.com/science/accretion-disk",
-                "description": "The accretor can be a forming star or planet, a normal star, or a compact object such as a white dwarf, a neutron star, or a black hole (in approximate order of increasing compactness). Accretion disks emit copious amounts of energy from the conversion of gravitational potential energy into radiation as the accreted material falls or spirals inward. If the accretor is a neutron star or a black ...",
-                "snippets": [
-                    "Because the disk material needs to lose energy to accrete onto the central object, the material in the disk gets hot, and the heat generated escapes through both sides of the disk. In X-ray binaries, where the accretor is a neutron star or a black hole, the temperatures in the accretion disks range from a few thousand to several million kelvins. Therefore, the disk emits light from infrared to low-energy (soft) X-ray wavelengths. Frequently parts of the disk may evaporate to form an even hotter low-density corona, similar to that of the Sun, emitting radiation in the high-energy (hard) X-ray range.",
-                    "accretion disk\n- Related Topics:\n- black hole\n- Eddington mass limit\n- accretion\naccretion disk, a disklike flow of gas, plasma, dust, or particles around any astronomical object in which the material orbiting in the gravitational field of the object loses energy and angular momentum as it slowly spirals inward. In astrophysics, the term accretion refers to the growth in mass of any celestial object due to its gravitational attraction. The formation of stars and planets and the powerful emissions from quasars, radio galaxies, X-ray binaries (see X-ray astronomy), and probably also Type Ia supernovas all involve accretion disks. The astronomical object whose mass is growing is known as the accretor.\nPhysical description",
-                    "An accretion disk forms whenever the matter being accreted possesses enough rotational or angular momentum that it cannot simply fall inward toward the accretor along a straight line. In directions perpendicular to the accretor’s rotation axis, the flow tends to flatten onto a disk because the rotation resists the inflow of the material. In directions parallel to the rotation axis, the matter contracts toward a plane until the thermal pressure inside the disk roughly equals the gravitational force.\nIf the thermal pressure, which resists compression, is small compared with gravity and rotation, which cause the disk to contract vertically, the disk will be geometrically thin, and its thickness will be much smaller than its radial extent. If pressure forces are comparable to rotation and gravity, the accretion disk will be geometrically thick, resembling more a torus than a disk."
-                ],
-                "title": "Accretion disk | Astronomy & Formation Processes | Britannica",
-                "meta": {
-                    "query": "how accretion disks form around black holes"
-                },
-                "citation_uuid": -1
-            },
-            "https://www.mdpi.com/2571-712X/6/2/33": {
-                "url": "https://www.mdpi.com/2571-712X/6/2/33",
-                "description": "Primordial black holes have become a highly intriguing and captivating field of study in cosmology due to their potential theoretical and observational significance. This review delves into a variety of mechanisms that could give rise to PBHs and explores various methods for examining their evolution through mass accretion.",
-                "snippets": [
-                    "Mechanisms of Producing Primordial Black Holes and Their Evolution\nAbstract\n:1. Introduction\n2. Production Mechanisms\n2.1. Initial Density Inhomogeneities\n2.2. First-Order Phase Transitions\n2.3. Second-Order Phase Transitions\n2.4. PBH Production in -Gravity\n3. Mass Accretion Mechanisms\n3.1. Bondi Accretion\n3.2. Accretion Inside Neutron Star\n3.3. Eddington Limit\n3.4. Accretion in Schwarzschild Spacetime\n3.5. McVittie Solution\n4. Discussion\n- Initial density inhomogeneities:Advantages: a broad mass spectrum.Disadvantages: it leads to strong inhomogeneities and there is no possibility to form clusters of PBHs.\n- First-order phase transitions:Advantages: it does not require any assumption beyond standard Big Bang physics.Disadvantages: The mass spectrum in this model is close to monochromatic, so it is impossible to explain the existence of black holes of various masses. It is also impossible to produce clusters of PBHs within this model.",
-                    "- Second-order phase transitions:Advantages: it has a broad mass spectrum and it also could be coupled with external processes, e.g., baryogenesis.Disadvantages: a fine-tuning of the initial conditions is required.\n- Bondi accretion:Advantages: a simple conventional model which is accurate enough.Disadvantages: it does not take into account possible relativistic effects and spacetime curvature.\n- Accretion in Schwarzschild spacetime:Advantages: it takes into account spacetime curvature.Disadvantages: cosmic expansion is not considered in this case.\n- McVittie solution:Advantages: it takes into account spacetime curvature with cosmic expansion.Disadvantages: it exhibits a superluminal motion of the fluid at a distance of .\nAuthor Contributions\nFunding\nInstitutional Review Board Statement\nInformed Consent Statement\nData Availability Statement\nAcknowledgments\nConflicts of Interest\nReferences"
-                ],
-                "title": "Mechanisms of Producing Primordial Black Holes and Their Evolution - MDPI",
-                "meta": {
-                    "query": "primary mechanisms for black hole growth"
-                },
-                "citation_uuid": -1
-            },
-            "https://www.nasa.gov/universe/what-are-black-holes/": {
-                "url": "https://www.nasa.gov/universe/what-are-black-holes/",
-                "description": "A black hole is an astronomical object with a gravitational pull so strong that nothing, not even light, can escape it. ... the enormous tidal forces in its vicinity cause nearby matter to heat up to millions of degrees and emit radio waves and X-rays. Some of the material orbiting even closer to the event horizon may be hurled out, forming ...",
-                "snippets": [
-                    "A black hole is an astronomical object with a gravitational pull so strong that nothing, not even light, can escape it. A black hole’s “surface,” called its event horizon, defines the boundary where the velocity needed to escape exceeds the speed of light, which is the speed limit of the cosmos. Matter and radiation fall in, but they can’t get out.\nTwo main classes of black holes have been extensively observed. Stellar-mass black holes with three to dozens of times the Sun’s mass are spread throughout our Milky Way galaxy, while supermassive monsters weighing 100,000 to billions of solar masses are found in the centers of most big galaxies, ours included."
-                ],
-                "title": "What Are Black Holes? - NASA",
-                "meta": {
-                    "query": "astronomical events that cause material accumulation near black holes"
-                },
-                "citation_uuid": -1
-            },
-            "https://science.nasa.gov/universe/black-holes/anatomy/": {
-                "url": "https://science.nasa.gov/universe/black-holes/anatomy/",
-                "description": "The main light source from a black hole is a structure called an accretion disk. Black holes grow by consuming matter, a process scientists call accretion, and by merging with other black holes. A stellar-mass black hole paired with a star may pull gas from it, and a supermassive black hole does the same from stars that stray too close.",
-                "snippets": [
-                    "The main light source from a black hole is a structure called an accretion disk. Black holes grow by consuming matter, a process scientists call accretion, and by merging with other black holes. A stellar-mass black hole paired with a star may pull gas from it, and a supermassive black hole does the same from stars that stray too close. The gas settles into a hot, bright, rapidly spinning disk. Matter gradually works its way from the outer part of the disk to its inner edge, where it falls into the event horizon. Isolated black holes that have consumed the matter surrounding them do not possess an accretion disk and can be very difficult to find and study."
-                ],
-                "title": "Black Hole Anatomy - Science@NASA",
-                "meta": {
-                    "query": "How does accretion work in black holes?"
-                },
-                "citation_uuid": -1
-            },
-            "https://astronomy.stackexchange.com/questions/2441/does-matter-accumulate-just-outside-the-event-horizon-of-a-black-hole": {
-                "url": "https://astronomy.stackexchange.com/questions/2441/does-matter-accumulate-just-outside-the-event-horizon-of-a-black-hole",
-                "description": "In the mid-90s, American and Dutch physicists Leonard Susskind and Gerard 't Hooft also addressed the information paradox by proposing that when something gets sucked into a black hole, its information leaves behind a kind of two-dimensional holographic imprint on the event horizon, which is a sort of ‘bubble’ that contains a black hole ...",
-                "snippets": [
-                    "What you're describing is basically the \"collapsed star\" (Eng) or \"frozen star\" (Rus) interpretation of black holes that was common prior to the late mid-1960s. It was a mistake.\nSuppose you are distant and stationary relative to the black hole. You will observe infalling matter asymptotically approaching the horizon, growing ever fainter as it redshifts. Does it mean that matter \"clumps\" around the horizon? To find out, suppose you throw yourself towards the black hole to try to catch the matter that you see. What you will find is that it fell into the black hole long ago.\nIn other words, the most sensible way to answer whether or not infalling matter clumps on the horizon is to look at the situation from the frame of that infalling matter. And there, it is clear: no, it does not clump, as it crosses the horizon in finite proper time. (As an aside, for a Schwarzschild black hole, falling from rest is exactly Newtonian in Schwarzschild radial coordinate and proper time.)"
-                ],
-                "title": "Does matter accumulate just outside the event horizon of a black hole?",
-                "meta": {
-                    "query": "astronomical events that cause material accumulation near black holes"
-                },
-                "citation_uuid": -1
-            },
-            "https://coffeetablescience.com/black-hole-types/": {
-                "url": "https://coffeetablescience.com/black-hole-types/",
-                "description": "Types of Black Holes. There are different types of black holes, and astronomers classify them by mass into three main categories: stellar mass, supermassive, and intermediate mass. The universe may also contain undiscovered examples of a fourth type of black hole, known as primordial black holes, created during the universe’s early stages.",
-                "snippets": [
-                    "- Formation: Researchers are currently attempting to determine the precise process of forming supermassive black holes. Several theories have been put forth, such as the direct collapse of massive gas clouds, the merger of smaller black holes, and the fast accretion of gas and dust in the early universe. Supermassive black holes may form as a result of any one of these processes.\n- Observation: The predominant method of observing supermassive black holes is through their gravitational pull on nearby matter. This includes the stars’ and gas clouds’ high velocities in the vicinity of the galactic centre, which point to the existence of a massive central object. Furthermore, the powerful radiation from the accretion disk—the material falling into the black hole—can be observed at various wavelengths, including radio, ultraviolet, optical, and X-rays.",
-                    "- Observation: Identifying intermediate-mass black holes presents a challenge due to their rarity and difficulty distinguishing them from other astronomical phenomena. They are typically observed indirectly through their gravitational effects on surrounding matter, such as stars and gas clouds. Some potential candidates for intermediate-mass black holes have been identified in globular clusters, dwarf galaxies, and active star-forming regions.\n- Role in Galaxy Evolution: The growth mechanisms of supermassive black holes and their role in galaxy evolution may be clarified by studying intermediate-mass black holes, which is why they are of special interest.\nPrimordial Black Holes\nImage credit: NASA/ESA and G. Bacon (STScI)",
-                    "- Formation: Massive stars collapse gravitationally to form stellar black holes. When a massive star exhausts its nuclear fuel, it can no longer support its own weight against gravitational collapse. A supernova explosion occurs when the star’s core collapses quickly, causing the remaining material to collapse even more and form a compact object. If the core’s mass is above a certain threshold (about three times the mass of the Sun), it collapses into a black hole.\n- Size: Stellar black holes are smaller than supermassive black holes. They are located in the centres of galaxies and typically have masses ranging from about 3 to 100 times that of the Sun. Their corresponding size can be just a few kilometres in diameter.\n- Event Horizon: Stellar black holes, like all other black holes, have an event horizon beyond which nothing can escape—not even light. Anything falling into the black hole will eventually reach this boundary and be lost forever",
-                    "Types of Black Holes\nThere are different types of black holes, and astronomers classify them by mass into three main categories: stellar mass, supermassive, and intermediate mass. The universe may also contain undiscovered examples of a fourth type of black hole, known as primordial black holes, created during the universe’s early stages.\nStellar Black Holes\nImage credit: NASA’s Goddard Space Flight Center; background, NASA/JPL-Caltech/UCLA\nStellar black holes are fascinating cosmic entities formed from the remnants of massive stars.",
-                    "Intermediate-mass black holes (IMBHs) range from hundreds to tens of thousands of solar masses, bridging the gap between stellar and supermassive black holes.\n- Formation: Though their exact origins are unknown, the collapse of massive stars in dense stellar environments, the runaway merging of stellar-mass black holes in globular clusters, or the direct collapse of massive gas clouds are the three main theories regarding the formation of intermediate-mass black holes. It’s possible that intermediate-mass black holes are a stage between supermassive black hole development and development.\n- Size and Mass: Intermediate-mass black holes can have masses hundreds to tens of thousands of times greater than the Sun. While they are much bigger than stellar-mass black holes created by the collapse of individual stars, they are smaller than supermassive black holes located at the centres of galaxies."
-                ],
-                "title": "Types of Black Holes: Everything you need to know",
-                "meta": {
-                    "query": "examples of black holes in different environments"
-                },
-                "citation_uuid": -1
-            },
-            "https://science.nasa.gov/universe/black-holes/types/": {
-                "url": "https://science.nasa.gov/universe/black-holes/types/",
-                "description": "Stellar-mass black holes can continue to gain mass through collisions with stars and other black holes. Nearly all the stellar-mass black holes observed so far have been found because they’re paired with stars. They likely originated as mismatched stars where the more massive one evolved rapidly into a black hole. In some cases, called X-ray ...",
-                "snippets": [
-                    "Types of Black Holes\nAstronomers generally divide black holes into three categories according to their mass: stellar-mass, supermassive, and intermediate-mass. The mass ranges that define each group are approximate, and scientists are always reassessing where the boundaries should be set. Cosmologists suspect a fourth type, primordial black holes formed during the birth of the universe, may also lurk undetected in the cosmos.\nStellar\nWhen a star with more than eight times the Sun’s mass runs out of fuel, its core collapses, rebounds, and explodes as a supernova. What’s left behind depends on the star’s mass before the explosion. If it was near the threshold, it creates a city-sized, superdense neutron star. If it had around 20 times the Sun’s mass or more, the star’s core collapses into a stellar-mass black hole."
-                ],
-                "title": "Black Hole Types - Science@NASA",
-                "meta": {
-                    "query": "how do black holes gain mass"
-                },
-                "citation_uuid": -1
-            },
-            "https://www.einstein-online.info/en/spotlight/accretion/": {
-                "url": "https://www.einstein-online.info/en/spotlight/accretion/",
-                "description": "During this process, the matter in the innermost regions manages to shed enough angular momentum to be able to fall onto (or into) the central object itself. In this way, more and more matter accretes onto the central object. ... no astronomer has managed to take detailed images of the accretion flow onto a central black hole – that would ...",
-                "snippets": [
-                    "In physics, wherever there is heat, there is thermal electromagnetic radiation. Every body emits thermal radiation – only a body with a temperature of absolute zero would not, but such bodies cannot exist (more information about thermal radiation can be found in the Spotlight topic Heat that meets the eye). As a body’s temperature increases, so does the energy emitted in the form of radiation. The temperature of an accretion disk around a black hole is high enough for the disk matter to emit large amounts of highly-energetic X-rays.\nMatter falling towards a central object, forming an accretion disk, represents an eminently efficient way to produce radiation from other forms of energy (in this case gravitational energy). It is roughly 30 times more efficient than nuclear fusion, the energy conversion mechanism responsible for the luminosity of our sun and other stars.",
-                    "Luminous disks: How black holes light up their surroundings\nHow the fact that black holes are very efficient in attracting surrounding matter leads to some of the most spectacularly luminous phenomena in the whole of the cosmos\nAn article by Andreas Müller\nGravity results in universal attraction between all masses. One possible consequence of this is accretion, the astrophysicists’ blanket term for processes in which a massive central object picks up (“accretes”) matter from its direct neighbourhood. Accretion causes the central object to become more massive, and thus ever better in picking up matter. As a first step towards understanding accretion, it is useful to take a look at a more general question: What are the possible outcomes when matter falls towards a central object?\nFalling matter"
-                ],
-                "title": "Luminous disks: How black holes light up their surroundings",
-                "meta": {
-                    "query": "What processes facilitate accretion of matter onto black holes?"
-                },
-                "citation_uuid": -1
-            },
-            "https://physics.stackexchange.com/questions/167250/is-there-a-limit-as-to-how-fast-a-black-hole-can-grow": {
-                "url": "https://physics.stackexchange.com/questions/167250/is-there-a-limit-as-to-how-fast-a-black-hole-can-grow",
-                "description": "The real difficulty is in growing the black hole because the Eddington rate is smaller for smaller black holes and the seeds for SMBH cannot have been more than of order 1000 solar masses. Radiation pressure is likely what limits the growth of a black hole. $\\endgroup$ – ProfRob. Commented Feb 26, 2015 at 19:30",
-                "snippets": [
-                    "A nice summary of the problem is given in the introduction of Volonteri, Silk & Dubus (2014). These authors also review some of the solutions that might allow Super-Eddington accretion and shorter growth timescales - there are a number of good ideas, but none has emerged as a front-runner yet."
-                ],
-                "title": "Is there a limit as to how fast a black hole can grow?",
-                "meta": {
-                    "query": "black hole growth rates in different conditions"
-                },
-                "citation_uuid": -1
-            },
-            "https://en.wikipedia.org/wiki/Event_horizon": {
-                "url": "https://en.wikipedia.org/wiki/Event_horizon",
-                "description": "In astrophysics, an event horizon is a boundary beyond which events cannot affect an outside observer. Wolfgang Rindler coined the term in the 1950s. [1]In 1784, John Michell proposed that gravity can be strong enough in the vicinity of massive compact objects that even light cannot escape. [2] At that time, the Newtonian theory of gravitation and the so-called corpuscular theory of light were ...",
-                "snippets": [
-                    "An alternative is provided by the complementarity principle, according to which, in the chart of the far observer, infalling matter is thermalized at the horizon and reemitted as Hawking radiation, while in the chart of an infalling observer matter continues undisturbed through the inner region and is destroyed at the singularity. This hypothesis does not violate the no-cloning theorem as there is a single copy of the information according to any given observer. Black hole complementarity is actually suggested by the scaling laws of strings approaching the event horizon, suggesting that in the Schwarzschild chart they stretch to cover the horizon and thermalize into a Planck length-thick membrane.\nA complete description of local event horizons generated by gravity is expected to, at minimum, require a theory of quantum gravity. One such candidate theory is M-theory. Another such candidate theory is loop quantum gravity.\nSee also\n[edit]- Abraham–Lorentz force\n- Acoustic metric"
-                ],
-                "title": "Event horizon - Wikipedia",
-                "meta": {
-                    "query": "how does matter cross the event horizon of a black hole"
-                },
-                "citation_uuid": -1
-            },
-            "https://www.space.com/black-holes-event-horizon-explained.html": {
-                "url": "https://www.space.com/black-holes-event-horizon-explained.html",
-                "description": "A coordinate singularity, which is the event horizon — the black hole's outer boundary, and a gravitational singularity, which represents the heart of the black hole.",
-                "snippets": [
-                    "\"The event horizon is the ultimate prison wall — one can get in but never get out,\" Avi Loeb, chair of astronomy at Harvard University, told Space.com.\nWhen an item gets near an event horizon, a witness would see the item's image redden and dim as gravity distorted light coming from that item. At the event horizon, this image would effectively fade to invisibility.\nWithin the event horizon, one would find the black hole's singularity, where previous research suggests all of the object's mass has collapsed to an infinitely dense extent. This means the fabric of space and time around the singularity has also curved to an infinite degree, so the laws of physics as we currently know them break down.\n\"The event horizon protects us from the unknown physics near a singularity,\" Loeb said.\nEvent horizon and black Hole FAQs answered by an expert\nXavier Calmet is a professor of physics and astronomy in the School of Mathematical and Physical Sciences at the University of Sussex, U.K.",
-                    "Could anything ever escape the event horizon of a black hole?\nThis is a fascinating question and is linked to the infamous Hawking information paradox. In 2022, along with my colleague Stephen Hsu, we demonstrated in a series of papers how information can escape a black hole. We theorized that information is encoded in the quantum state of the gravitational field outside the black hole and imprinted in Hawking radiation and thus fully available to an outside observer. In that sense, information about what fell into a black hole can always be recovered.\nEinstein, black holes, and event horizons: A tale of two singularities\nThe black hole and event horizon concepts were born from the 1915 theory of gravity conceived by Albert Einstein known as general relativity and solutions to the tensor equations that define it. A tenor is a mathematical equation that is similar to a vector but with four values rather than two. As a result, tensors are also sometimes called \"four-vectors.\"",
-                    "Eisenstaedt, D. Howard, J. Stachel (eds), The Early Interpretation of the Schwarzschild Solution, Einstein and the History of General Relativity: Einstein Studies, Vol. 1, pp. 213-234. Boston: Birkhauser, \nJoin our Space Forums to keep talking space on the latest missions, night sky and more! And if you have a news tip, correction or comment, let us know at: community@space.com.\nGet the Space.com Newsletter\nBreaking space news, the latest updates on rocket launches, skywatching events and more!\nRobert Lea is a science journalist in the U.K. whose articles have been published in Physics World, New Scientist, Astronomy Magazine, All About Space, Newsweek and ZME Science. He also writes about science communication for Elsevier and the European Journal of Physics. Rob holds a bachelor of science degree in physics and astronomy from the U.K.’s Open University. Follow him on Twitter @sciencef1rst.\n- Charles Q. ChoiContributing Writer"
-                ],
-                "title": "What is a black hole event horizon (and what happens there)? - Space.com",
-                "meta": {
-                    "query": "how does matter cross the event horizon of a black hole"
-                },
-                "citation_uuid": -1
-            }
-        }
+  "article": "# Summary\n\n...",
+
+  "references": {
+    "url_to_unified_index": {},
+    "url_to_info": {
+      "https://example.com/resource": {
+        "snippets": ["Excerpt 1"],
+        "citation_uuid": -1
+      }
+    }
+  }
+}
+```
+
+The article is Markdown formatted. Reference maps provide metadata keyed by the canonical URL.
+
+## Conversational Co-STORM API
+
+### Session Lifecycle
+
+1. **Create a session** with `POST /conversation/sessions`; warm-start tasks run asynchronously.
+2. **Listen for warm-start events** via polling or streaming.
+3. **Send user turns** using `POST /conversation/sessions/{id}/messages`.
+4. **Consume updates** through `/updates` (long poll) or `/stream` (SSE).
+5. **Inspect the session** using `GET /conversation/sessions/{id}` as needed.
+6. **Close the session** with `DELETE /conversation/sessions/{id}` when finished.
+
+Sessions expire automatically based on `COSTORM_SESSION_TTL_SECONDS`.
+
+### Create Session
+
+`POST /conversation/sessions`
+
+| Body field         | Type   | Required | Description                                                             |
+| ------------------ | ------ | -------- | ----------------------------------------------------------------------- |
+| `topic`            | string | yes      | Research brief or problem statement.                                    |
+| `user_id`          | string | no       | External user handle; defaults to `anonymous`.                          |
+| `runner_overrides` | object | no       | Override fields accepted by `RunnerArgument` (model names, caps, etc.). |
+
+Success (`201 Created`):
+
+```json
+{
+  "session_id": "2f9b9699-4b0f-4d77-a62c-4d7c7c6b7bb0",
+  "topic": "Next-gen battery materials",
+  "created_at": "2025-10-18T13:25:40.123456Z",
+  "events": [
+    {
+      "event_id": "1",
+      "event_type": "session.created",
+      "payload": {
+        "session_id": "2f9b9699-4b0f-4d77-a62c-4d7c7c6b7bb0",
+        "topic": "Next-gen battery materials",
+        "user_id": "product-team"
+      },
+      "created_at": "2025-10-18T13:25:40.123456Z"
+    }
+  ]
+}
+```
+
+Warm-start events continue streaming until the initial knowledge base and report scaffolding are prepared.
+
+### Post Message
+
+`POST /conversation/sessions/{session_id}/messages`
+
+| Body field             | Type   | Required    | Description                                                                    |
+| ---------------------- | ------ | ----------- | ------------------------------------------------------------------------------ |
+| `message`              | string | yes         | User utterance.                                                                |
+| `wait_for_response`    | bool   | no          | Block until new events arrive; default `false`.                                |
+| `after_event_id`       | string | conditional | Required when `wait_for_response` is true; acts as cursor.                     |
+| `wait_timeout_seconds` | number | no          | Max wait duration in seconds (defaults to `COSTORM_STREAM_HEARTBEAT_SECONDS`). |
+
+Response:
+
+```json
+{
+  "session_id": "2f9b9699-4b0f-4d77-a62c-4d7c7c6b7bb0",
+  "status": "completed",
+  "events": [
+    {
+      "event_id": "8",
+      "event_type": "conversation.turn",
+      "payload": {
+        "role": "Guest",
+        "utterance": "What are the latest silicon anode breakthroughs?"
+      },
+      "created_at": "2025-10-18T13:28:14.982341Z"
+    }
+  ]
+}
+```
+
+If `wait_for_response` is false the call returns immediately with `status: "queued"` and an empty `events` list.
+
+### Poll Updates
+
+`GET /conversation/sessions/{session_id}/updates`
+
+| Query param | Type   | Description                                                             |
+| ----------- | ------ | ----------------------------------------------------------------------- |
+| `after`     | string | Optional cursor (exclusive). When omitted, returns all buffered events. |
+| `timeout`   | number | Optional long-poll timeout in seconds.                                  |
+
+```sh
+curl --get 'https://YOUR_STORM_HOST/conversation/sessions/SESSION_ID/updates' \
+    --header 'Authorization: Bearer YOUR_API_KEY' \
+    --data-urlencode 'after=12' \
+    --data-urlencode 'timeout=10'
+```
+
+### Stream Updates
+
+`GET /conversation/sessions/{session_id}/stream`
+
+- Returns an SSE stream (`Content-Type: text/event-stream`).
+- Heartbeat comments (`: heartbeat`) are sent every `COSTORM_STREAM_HEARTBEAT_SECONDS` seconds.
+- Use `Last-Event-ID` or append `?after=EVENT_ID` to resume a dropped stream.
+
+### Get Session View
+
+`GET /conversation/sessions/{session_id}`
+
+- Returns a snapshot of session metadata, latest knowledge base, and most recent report draft.
+- Add `?include_events=true` to receive any buffered events in the same response.
+
+```json
+{
+    "session": {
+        "session_id": "2f9b9699-4b0f-4d77-a62c-4d7c7c6b7bb0",
+        "topic": "Next-gen battery materials",
+        "user_id": "product-team",
+        "created_at": "2025-10-18T13:25:40.123456Z",
+        "updated_at": "2025-10-18T13:28:15.410002Z",
+        "warm_start_complete": true,
+        "knowledge_base": {...},
+        "report": "# Summary\n\n..."
     }
 }
 ```
+
+### Delete Session
+
+`DELETE /conversation/sessions/{session_id}`
+
+```json
+{
+  "session_id": "2f9b9699-4b0f-4d77-a62c-4d7c7c6b7bb0",
+  "status": "deleted"
+}
+```
+
+All cached state, including Redis entries, is purged.
+
+### Event Types
+
+| Event type               | Payload keys                                    | Description                                   |
+| ------------------------ | ----------------------------------------------- | --------------------------------------------- |
+| `session.created`        | `session_id`, `topic`, `user_id`                | Session bootstrap metadata.                   |
+| `session.error`          | `message`, `retryable`                          | Background error; session may still continue. |
+| `session.closed`         | `session_id`                                    | Session closed by client or TTL.              |
+| `knowledge_base.updated` | Knowledge base tree                             | Latest knowledge base snapshot.               |
+| `conversation.turn`      | `role`, `utterance`, `raw_utterance`, `sources` | Any turn authored by agents or users.         |
+
+### Error Responses
+
+| Status | Body                                                            | Meaning                                   |
+| ------ | --------------------------------------------------------------- | ----------------------------------------- |
+| `400`  | `{ "error": "invalid_request", "message": "details" }`          | Missing or malformed input.               |
+| `401`  | `{ "error": "unauthorized" }`                                   | Missing or invalid API key.               |
+| `403`  | `{ "error": "forbidden" }`                                      | API key does not match the session owner. |
+| `404`  | `{ "error": "not_found" }`                                      | Unknown session id.                       |
+| `409`  | `{ "error": "conflict", "message": "session already warming" }` | Duplicate warm-start attempt.             |
+| `500`  | `{ "error": "internal", "message": "details" }`                 | Unhandled server failure.                 |
+
+## Configuration Reference
+
+| Key                                | Default                      | Description                                    |
+| ---------------------------------- | ---------------------------- | ---------------------------------------------- |
+| `OPENAI_API_TYPE`                  | `openai`                     | Provider name forwarded to LiteLLM/dspy.       |
+| `OPENAI_API_BASE`                  | `https://api.openai.com/v1/` | Base URL for compatible REST calls.            |
+| `OPENAI_MODEL_NAME`                | `gpt-4o-mini`                | Default chat model identifier.                 |
+| `OPENAI_MAX_TOKENS`                | `1000`                       | Per-call generation cap for the primary model. |
+| `BING_SEARCH_API_KEY`              | none                         | Required for retrieval-augmented search.       |
+| `REDIS_HOST`                       | empty                        | Enables Redis-backed state when set.           |
+| `REDIS_PORT`                       | `6379`                       | Redis port number.                             |
+| `REDIS_DB`                         | `0`                          | Redis database index.                          |
+| `COSTORM_RETRIEVE_TOP_K`           | `6`                          | Web results fetched per query.                 |
+| `COSTORM_TOTAL_CONV_TURN`          | `20`                         | Maximum number of conversation turns.          |
+| `COSTORM_MAX_SEARCH_QUERIES`       | `2`                          | Parallel search jobs per step.                 |
+| `COSTORM_MAX_SEARCH_THREAD`        | `5`                          | Thread pool size for retrieval.                |
+| `COSTORM_MAX_EVENT_HISTORY`        | `512`                        | Events stored per session in memory/Redis.     |
+| `COSTORM_EVENT_TTL_SECONDS`        | `3600`                       | TTL for event lists when using Redis.          |
+| `COSTORM_SESSION_TTL_SECONDS`      | `86400`                      | TTL before session metadata expires.           |
+| `COSTORM_STREAM_HEARTBEAT_SECONDS` | `30`                         | SSE heartbeat interval.                        |
+| `COSTORM_REPORT_MAX_TOKENS`        | `1500`                       | Token budget for article/report generation.    |
+
+Defaults are defined in `knowledge_storm/server/__main__.py`; override them via environment variables or container configuration.
+
+## Redis and Persistence
+
+- When `REDIS_HOST` is configured, the service stores:
+  - Session metadata (`costorm:sessions:{id}:meta`).
+  - Serialized session state (`...:state`).
+  - Ordered event streams (`...:events`).
+- Redis also drives the background task queue for warm-start and long-running generation jobs.
+- Without Redis, all state is held in-process; restarting the server clears every active session but `/deep-research` remains unaffected.
+
+## FAQ
+
+- **How do I resume a session after a client crash?** Fetch `GET /conversation/sessions/{id}` to confirm the session exists, then resume polling or streaming with the last processed `event_id`.
+- **Can I change runner parameters mid-session?** No. Supply overrides when creating the session. To change them later, start a new session.
+- **How do I detect warm-start completion?** Watch for a `knowledge_base.updated` event or check `warm_start_complete` in the session snapshot.
