@@ -148,7 +148,10 @@ class ConversationStorage:
             members = self._redis.smembers(self.INDEX_KEY)
             if members is None:
                 return []
-            return [member.decode("utf-8") if isinstance(member, bytes) else member for member in members]
+            return [
+                member.decode("utf-8") if isinstance(member, bytes) else member
+                for member in members
+            ]
         except Exception as exc:  # pragma: no cover - logging only
             self._logger.exception("Failed to list session ids", exc_info=exc)
             return []
@@ -211,7 +214,9 @@ class ConversationStorage:
             raw_events = self._events_store.get(session_id, [])
         else:
             try:
-                raw_events = self._redis.lrange(self._events_key(session_id), 0, -1) or []
+                raw_events = (
+                    self._redis.lrange(self._events_key(session_id), 0, -1) or []
+                )
             except Exception as exc:  # pragma: no cover - logging only
                 self._logger.exception("Failed to load session events", exc_info=exc)
                 raw_events = []
@@ -370,17 +375,21 @@ class ConversationSession:
         """Schedule a background coroutine for the session."""
         task = self._loop.create_task(coro)
         self._background_tasks.append(task)
+
         def _discard(completed: asyncio.Task) -> None:
             try:
                 self._background_tasks.remove(completed)
             except ValueError:
                 pass
+
         task.add_done_callback(_discard)
 
     # -----------------------------
     # Event publishing
     # -----------------------------
-    def _publish_event(self, event_type: str, payload: Dict[str, Any]) -> ConversationEvent:
+    def _publish_event(
+        self, event_type: str, payload: Dict[str, Any]
+    ) -> ConversationEvent:
         """Create, persist, and broadcast a session event."""
         event = ConversationEvent(
             event_id=self._next_event_id(),
@@ -395,13 +404,17 @@ class ConversationSession:
         self.updated_at = event.created_at
         self._storage.append_event(self.session_id, event)
         self._persist_meta()
+
         async def notify() -> None:
             async with self._event_cv:
                 self._event_cv.notify_all()
+
         self._loop.create_task(notify())
         return event
 
-    def _publish_system_event(self, event_type: str, payload: Dict[str, Any]) -> ConversationEvent:
+    def _publish_system_event(
+        self, event_type: str, payload: Dict[str, Any]
+    ) -> ConversationEvent:
         """Publish an event emitted by the system."""
         return self._publish_event(event_type, payload)
 
@@ -424,15 +437,11 @@ class ConversationSession:
         else:
             runner_argument_dict = {"topic": self.topic}
         conversation_history = [
-            self._turn_to_payload(
-                turn, getattr(turn, "role", "")
-            )
+            self._turn_to_payload(turn, getattr(turn, "role", ""))
             for turn in getattr(runner, "conversation_history", [])
         ]
         warmstart_archive = [
-            self._turn_to_payload(
-                turn, getattr(turn, "role", "")
-            )
+            self._turn_to_payload(turn, getattr(turn, "role", ""))
             for turn in getattr(runner, "warmstart_conv_archive", [])
         ]
         experts = []
@@ -471,7 +480,9 @@ class ConversationSession:
             return list(self._events)
         return events
 
-    async def wait_for_events(self, current_event_id: Optional[str], timeout: Optional[float]) -> None:
+    async def wait_for_events(
+        self, current_event_id: Optional[str], timeout: Optional[float]
+    ) -> None:
         """Block until new events arrive or the timeout elapses."""
         _ = current_event_id  # parameter retained for future logic and to mirror interface
         if timeout is None or timeout <= 0:
@@ -486,7 +497,9 @@ class ConversationSession:
     # Warm start and conversation flow
     # -----------------------------
     async def _run_in_executor(self, func, *args, **kwargs):
-        return await self._loop.run_in_executor(self._executor, lambda: func(*args, **kwargs))
+        return await self._loop.run_in_executor(
+            self._executor, lambda: func(*args, **kwargs)
+        )
 
     async def _run_warm_start(self) -> None:
         if self._closed:
@@ -525,7 +538,11 @@ class ConversationSession:
 
     def _publish_knowledge_event(self) -> None:
         knowledge_base = getattr(self._runner, "knowledge_base", None)
-        payload = knowledge_base.to_dict() if knowledge_base and hasattr(knowledge_base, "to_dict") else {}
+        payload = (
+            knowledge_base.to_dict()
+            if knowledge_base and hasattr(knowledge_base, "to_dict")
+            else {}
+        )
         self._publish_system_event("knowledge_base.updated", payload)
 
     # -----------------------------
@@ -543,7 +560,9 @@ class ConversationSession:
         if hasattr(self._runner, "generate_report"):
             try:
                 report = self._runner.generate_report()
-            except Exception:  # noqa: BLE001  # pragma: no cover - report generation is optional in tests
+            except (
+                Exception
+            ):  # noqa: BLE001  # pragma: no cover - report generation is optional in tests
                 report = None
         return {
             "session_id": self.session_id,
@@ -551,7 +570,11 @@ class ConversationSession:
             "user_id": self.user_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
-            "knowledge_base": knowledge_base.to_dict() if knowledge_base and hasattr(knowledge_base, "to_dict") else {},
+            "knowledge_base": (
+                knowledge_base.to_dict()
+                if knowledge_base and hasattr(knowledge_base, "to_dict")
+                else {}
+            ),
             "report": report,
         }
 
@@ -590,7 +613,9 @@ class ConversationSession:
         else:
             payload = {
                 "role": role,
-                "utterance": getattr(turn, "utterance", getattr(turn, "raw_utterance", "")),
+                "utterance": getattr(
+                    turn, "utterance", getattr(turn, "raw_utterance", "")
+                ),
             }
         payload.setdefault("role", role)
         payload.setdefault("raw_utterance", payload.get("utterance", ""))
@@ -673,9 +698,7 @@ class SessionManager:
         runner_overrides = meta.get("runner_overrides") or {}
         restored_state_dict = self._storage.load_state(session_id)
         restored_state = (
-            SessionState.from_dict(restored_state_dict)
-            if restored_state_dict
-            else None
+            SessionState.from_dict(restored_state_dict) if restored_state_dict else None
         )
         runner = self._runner_factory(
             api_key,

@@ -76,18 +76,28 @@ COSTORM_RETRIEVE_TOP_K = int(os.getenv("COSTORM_RETRIEVE_TOP_K", "6"))
 COSTORM_TOTAL_CONV_TURN = int(os.getenv("COSTORM_TOTAL_CONV_TURN", "20"))
 COSTORM_MAX_SEARCH_QUERIES = int(os.getenv("COSTORM_MAX_SEARCH_QUERIES", "2"))
 COSTORM_MAX_SEARCH_THREAD = int(os.getenv("COSTORM_MAX_SEARCH_THREAD", "5"))
-COSTORM_MAX_SEARCH_QUERIES_PER_TURN = int(os.getenv("COSTORM_MAX_SEARCH_QUERIES_PER_TURN", "3"))
-COSTORM_WARMSTART_MAX_NUM_EXPERTS = int(os.getenv("COSTORM_WARMSTART_MAX_NUM_EXPERTS", "3"))
-COSTORM_WARMSTART_MAX_TURN_PER_EXPERT = int(os.getenv("COSTORM_WARMSTART_MAX_TURN_PER_EXPERT", "2"))
+COSTORM_MAX_SEARCH_QUERIES_PER_TURN = int(
+    os.getenv("COSTORM_MAX_SEARCH_QUERIES_PER_TURN", "3")
+)
+COSTORM_WARMSTART_MAX_NUM_EXPERTS = int(
+    os.getenv("COSTORM_WARMSTART_MAX_NUM_EXPERTS", "3")
+)
+COSTORM_WARMSTART_MAX_TURN_PER_EXPERT = int(
+    os.getenv("COSTORM_WARMSTART_MAX_TURN_PER_EXPERT", "2")
+)
 COSTORM_WARMSTART_MAX_THREAD = int(os.getenv("COSTORM_WARMSTART_MAX_THREAD", "3"))
 COSTORM_MAX_THREAD_NUM = int(os.getenv("COSTORM_MAX_THREAD_NUM", "10"))
-COSTORM_MAX_NUM_ROUND_TABLE_EXPERTS = int(os.getenv("COSTORM_MAX_NUM_ROUND_TABLE_EXPERTS", "2"))
+COSTORM_MAX_NUM_ROUND_TABLE_EXPERTS = int(
+    os.getenv("COSTORM_MAX_NUM_ROUND_TABLE_EXPERTS", "2")
+)
 COSTORM_MODERATOR_OVERRIDE = int(os.getenv("COSTORM_MODERATOR_OVERRIDE", "3"))
 COSTORM_NODE_EXPANSION_TRIGGER = int(os.getenv("COSTORM_NODE_EXPANSION_TRIGGER", "10"))
 COSTORM_MAX_EVENT_HISTORY = int(os.getenv("COSTORM_MAX_EVENT_HISTORY", "512"))
 COSTORM_EVENT_TTL_SECONDS = int(os.getenv("COSTORM_EVENT_TTL_SECONDS", "3600"))
 COSTORM_SESSION_TTL_SECONDS = int(os.getenv("COSTORM_SESSION_TTL_SECONDS", "86400"))
-COSTORM_STREAM_HEARTBEAT_SECONDS = float(os.getenv("COSTORM_STREAM_HEARTBEAT_SECONDS", "30"))
+COSTORM_STREAM_HEARTBEAT_SECONDS = float(
+    os.getenv("COSTORM_STREAM_HEARTBEAT_SECONDS", "30")
+)
 # =====================================
 
 redis_client: Optional[redis.Redis] = None
@@ -147,7 +157,9 @@ def create_storm_wiki_runner(apikey: str) -> STORMWikiRunner:
     return STORMWikiRunner(engine_args, lm_configs, rm)
 
 
-def _build_runner_argument(topic: str, overrides: Optional[Dict[str, Any]]) -> RunnerArgument:
+def _build_runner_argument(
+    topic: str, overrides: Optional[Dict[str, Any]]
+) -> RunnerArgument:
     """Create RunnerArgument from defaults merged with user overrides."""
     base_kwargs: Dict[str, Any] = {
         "topic": topic,
@@ -280,7 +292,9 @@ def extract_api_key(request: aiohttp.web.Request) -> str:
     header = request.headers.get("Authorization", "").strip()
     api_key = header.removeprefix("Bearer ").strip()
     if not api_key:
-        raise web.HTTPUnauthorized(reason="Authorization header with Bearer token is required")
+        raise web.HTTPUnauthorized(
+            reason="Authorization header with Bearer token is required"
+        )
     return api_key
 
 
@@ -289,10 +303,16 @@ def _event_to_json(event: ConversationEvent) -> Dict[str, Any]:
     return event.to_dict()
 
 
-async def _write_sse_event(response: web.StreamResponse, event: ConversationEvent) -> None:
+async def _write_sse_event(
+    response: web.StreamResponse, event: ConversationEvent
+) -> None:
     """Send a single event over an SSE stream."""
     payload = json.dumps(event.to_dict())
-    chunk = f"id: {event.event_id}\nevent: {event.event_type}\ndata: {payload}\n\n".encode("utf-8")
+    chunk = (
+        f"id: {event.event_id}\nevent: {event.event_type}\ndata: {payload}\n\n".encode(
+            "utf-8"
+        )
+    )
     await response.write(chunk)
     await response.drain()
 
@@ -337,7 +357,9 @@ async def handle_create_session(request: aiohttp.web.Request) -> aiohttp.web.Res
     )
 
 
-async def handle_conversation_message(request: aiohttp.web.Request) -> aiohttp.web.Response:
+async def handle_conversation_message(
+    request: aiohttp.web.Request,
+) -> aiohttp.web.Response:
     """Append a user utterance to an existing session."""
     api_key = extract_api_key(request)
     session_id = request.match_info["session_id"]
@@ -349,8 +371,12 @@ async def handle_conversation_message(request: aiohttp.web.Request) -> aiohttp.w
     wait_for_response = bool(payload.get("wait_for_response", False))
     after_event_id = payload.get("after_event_id")
     if wait_for_response and after_event_id is None:
-        raise web.HTTPBadRequest(reason="after_event_id is required when wait_for_response is true")
-    wait_timeout = float(payload.get("wait_timeout_seconds", COSTORM_STREAM_HEARTBEAT_SECONDS))
+        raise web.HTTPBadRequest(
+            reason="after_event_id is required when wait_for_response is true"
+        )
+    wait_timeout = float(
+        payload.get("wait_timeout_seconds", COSTORM_STREAM_HEARTBEAT_SECONDS)
+    )
 
     try:
         await session_manager.enqueue_message(session_id, api_key, message)
@@ -380,7 +406,9 @@ async def handle_get_session(request: aiohttp.web.Request) -> aiohttp.web.Respon
     """Return session metadata and optionally its historical events."""
     api_key = extract_api_key(request)
     session_id = request.match_info["session_id"]
-    include_events = request.rel_url.query.get("include_events", "false").lower() == "true"
+    include_events = (
+        request.rel_url.query.get("include_events", "false").lower() == "true"
+    )
 
     try:
         view = await session_manager.get_view(session_id, api_key)
@@ -396,7 +424,9 @@ async def handle_get_session(request: aiohttp.web.Request) -> aiohttp.web.Respon
     return web.json_response(response)
 
 
-async def handle_get_session_updates(request: aiohttp.web.Request) -> aiohttp.web.Response:
+async def handle_get_session_updates(
+    request: aiohttp.web.Request,
+) -> aiohttp.web.Response:
     """Fetch conversation events produced after a given cursor."""
     api_key = extract_api_key(request)
     session_id = request.match_info["session_id"]
@@ -441,11 +471,15 @@ async def handle_stream_session(request: aiohttp.web.Request) -> web.StreamRespo
     )
     await response.prepare(request)
 
-    last_event_id = request.headers.get("Last-Event-ID") or request.rel_url.query.get("after")
+    last_event_id = request.headers.get("Last-Event-ID") or request.rel_url.query.get(
+        "after"
+    )
     last_sent = last_event_id
 
     try:
-        initial_events = await session_manager.get_updates(session_id, api_key, after_event_id=last_event_id)
+        initial_events = await session_manager.get_updates(
+            session_id, api_key, after_event_id=last_event_id
+        )
         for event in initial_events:
             await _write_sse_event(response, event)
             last_sent = event.event_id
@@ -568,10 +602,16 @@ def create_app() -> web.Application:
     app["session_manager"] = session_manager
     app.router.add_post("/deep-research", handle_deep_research)
     app.router.add_post("/conversation/sessions", handle_create_session)
-    app.router.add_post("/conversation/sessions/{session_id}/messages", handle_conversation_message)
+    app.router.add_post(
+        "/conversation/sessions/{session_id}/messages", handle_conversation_message
+    )
     app.router.add_get("/conversation/sessions/{session_id}", handle_get_session)
-    app.router.add_get("/conversation/sessions/{session_id}/updates", handle_get_session_updates)
-    app.router.add_get("/conversation/sessions/{session_id}/stream", handle_stream_session)
+    app.router.add_get(
+        "/conversation/sessions/{session_id}/updates", handle_get_session_updates
+    )
+    app.router.add_get(
+        "/conversation/sessions/{session_id}/stream", handle_stream_session
+    )
     app.router.add_delete("/conversation/sessions/{session_id}", handle_delete_session)
 
     async def _on_cleanup(application: web.Application) -> None:
