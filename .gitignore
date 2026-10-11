@@ -18,6 +18,9 @@ build/
 *.egg-info/
 .idea
 .venv
+/venv
+/activate
+/temp
 
 # Project-specific
 secrets.toml

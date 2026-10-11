@@ -1,10 +1,15 @@
-dspy_ai==2.4.9
+dspy-ai==2.5.43
+openai~=1.61.1
 wikipedia==1.4.0
 sentence-transformers
 toml
 langchain-text-splitters
 trafilatura
 langchain-huggingface
-qdrant-client
-langchain-qdrant
+# qdrant-client
+# langchain-qdrant
 numpy==1.26.4
+# litellm==1.59.3
+diskcache
+kipp~=0.3.2
+lxml==5.3.0

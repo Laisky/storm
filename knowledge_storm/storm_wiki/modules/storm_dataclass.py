@@ -4,7 +4,14 @@ from collections import OrderedDict
 from typing import Union, Optional, Any, List, Tuple, Dict
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError as exc:
+    raise ImportError(
+        "SentenceTransformer is required for knowledge_storm.storm_wiki modules. "
+        "Install the 'sentence-transformers' package to continue."
+    ) from exc
 from sklearn.metrics.pairwise import cosine_similarity
 
 from ...interface import Information, InformationTable, Article, ArticleSectionNode
@@ -114,9 +121,7 @@ class StormInformationTable(InformationTable):
             for snippet in information.snippets:
                 self.collected_urls.append(url)
                 self.collected_snippets.append(snippet)
-        self.encoded_snippets = self.encoder.encode(
-            self.collected_snippets, show_progress_bar=False
-        )
+        self.encoded_snippets = self.encoder.encode(self.collected_snippets)
 
     def retrieve_information(
         self, queries: Union[List[str], str], search_top_k
@@ -126,7 +131,7 @@ class StormInformationTable(InformationTable):
         if type(queries) is str:
             queries = [queries]
         for query in queries:
-            encoded_query = self.encoder.encode(query, show_progress_bar=False)
+            encoded_query = self.encoder.encode(query)
             sim = cosine_similarity([encoded_query], self.encoded_snippets)[0]
             sorted_indices = np.argsort(sim)
             for i in sorted_indices[-search_top_k:][::-1]:
@@ -484,6 +489,12 @@ class StormArticle(Article):
         for url in reference["url_to_info"]:
             reference["url_to_info"][url] = reference["url_to_info"][url].to_dict()
         FileIOHelper.dump_json(reference, file_path)
+
+    def dump_reference_to_string(self):
+        reference = copy.deepcopy(self.reference)
+        for url in reference["url_to_info"]:
+            reference["url_to_info"][url] = reference["url_to_info"][url].to_dict()
+        return reference
 
     def dump_article_as_plain_text(self, file_path):
         text = self.to_string()
