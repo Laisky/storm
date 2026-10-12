@@ -9,6 +9,8 @@ langchain-huggingface
 # qdrant-client
 # langchain-qdrant
 numpy==1.26.4
+# PyArrow 26 requires NumPy 2; preserve the supported NumPy 1 baseline.
+pyarrow==25.0.0
 # litellm==1.59.3
 diskcache
 kipp~=0.3.2
