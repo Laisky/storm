@@ -1,4 +1,4 @@
-name: Check Python formatting with Black
+name: Check Python formatting and fast context unit
 
 on:
   pull_request:
@@ -8,9 +8,16 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: psf/black@stable
         with:
-          black_args: "knowledge_storm --check"
+          version: '25.1.0'
+          options: '--check'
+          src: 'knowledge_storm frontend/demo_light/tests tests/test_image_runtime.py tests/test_docker_build_context.py'
+      - name: Fast Docker context boundary unit
+        run: python -m unittest discover -s tests -p test_docker_build_context.py -v
