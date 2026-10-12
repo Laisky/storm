@@ -11,6 +11,7 @@ import sys
 import tempfile
 from typing import Optional
 import unittest
+from types import SimpleNamespace
 
 import pytz
 import streamlit as st
@@ -25,6 +26,8 @@ def load_helpers():
     """load_helpers loads real frontend definitions without importing paid backend clients."""
     names = {
         "DemoFileIOHelper",
+        "DemoUIHelper",
+        "get_demo_dir",
         "DemoTextProcessingHelper",
         "_construct_citation_dict_from_search_result",
         "_display_main_article_text",
@@ -49,6 +52,7 @@ def load_helpers():
         st=st,
         stoc=stoc,
         Optional=Optional,
+        __file__=str(FRONTEND / "demo_util.py"),
     )
     exec(
         compile(
@@ -68,6 +72,32 @@ def app_source(body):
         "import streamlit as st\nfrom test_frontend import load_helpers\n"
         "globals().update(load_helpers())\n" + body
     )
+
+
+def load_article_page():
+    """load_article_page returns the real MyArticles function with real offline UI helpers."""
+    from streamlit_card import card
+
+    path = FRONTEND / "pages_util" / "MyArticles.py"
+    tree = ast.parse(path.read_text())
+    nodes = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "my_articles_page"
+    ]
+    namespace = dict(
+        os=os, st=st, card=card, demo_util=SimpleNamespace(**load_helpers())
+    )
+    namespace.update(load_helpers())
+    exec(
+        compile(
+            ast.fix_missing_locations(ast.Module(body=nodes, type_ignores=[])),
+            str(path),
+            "exec",
+        ),
+        namespace,
+    )
+    return namespace["my_articles_page"]
 
 
 class FrontendCompatibilityTests(unittest.TestCase):
@@ -185,6 +215,72 @@ class FrontendCompatibilityTests(unittest.TestCase):
         self.assertNotIn("page1_cache", state)
         self.assertEqual(state["page2_cache"], "active")
         self.assertEqual(state["selected_page"], 2)
+
+    def test_complete_article_panel_preserves_sidebar_and_conversation(self):
+        """test_complete_article_panel_preserves_sidebar_and_conversation exercises the full article layout."""
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "storm_gen_article_polished.txt").write_text(
+                "# Polished\n## Evidence\nOffline claim [1]."
+            )
+            (root / "url_to_info.json").write_text(
+                json.dumps(
+                    {
+                        "url_to_unified_index": {"https://example.com": 1},
+                        "url_to_info": {
+                            "https://example.com": {
+                                "title": "Offline reference",
+                                "snippets": ["source"],
+                            }
+                        },
+                    }
+                )
+            )
+            (root / "conversation_log.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "perspective": "Historian: Context",
+                            "dlg_turns": [
+                                {
+                                    "user_utterance": "Question",
+                                    "agent_utterance": "Answer",
+                                }
+                            ],
+                        }
+                    ]
+                )
+            )
+            files = {f.name: str(f) for f in root.iterdir()}
+            app = AppTest.from_string(
+                app_source("_display_main_article(" + repr(files) + ")\n")
+            ).run(timeout=15)
+            self.assertEqual(len(app.exception), 0)
+            self.assertTrue(any("Offline claim" in m.value for m in app.markdown))
+            self.assertEqual(app.sidebar.selectbox[0].value, "reference [1]")
+            self.assertTrue(
+                any("Offline reference" in m.value for m in app.sidebar.markdown)
+            )
+            self.assertEqual(len(app.get("chat_message")), 2)
+
+    def test_my_articles_card_preserves_title_image_and_pagination(self):
+        """test_my_articles_card_preserves_title_image_and_pagination runs the real page and card component."""
+        source = app_source(
+            "from test_frontend import load_article_page\n"
+            "st.session_state['page2_user_articles_file_path_dict'] = {'Offline_Article': {}}\n"
+            "load_article_page()()\n"
+        )
+        app = AppTest.from_string(source).run(timeout=15)
+        self.assertEqual(len(app.exception), 0)
+        self.assertEqual(app.selectbox[0].value, 24)
+        self.assertEqual(app.number_input[0].value, 1)
+        cards = app.get("component_instance")
+        self.assertEqual(len(cards), 1)
+        args = json.loads(cards[0].proto.json_args)
+        self.assertEqual(args["title"], "My Article")
+        self.assertEqual(args["text"], "Offline Article")
+        self.assertTrue(args["image"].startswith("data:image/"))
+        self.assertEqual(args["styles"]["card"]["border-left"], "0.5rem solid #9AD8E1")
 
 
 if __name__ == "__main__":
